@@ -10,9 +10,12 @@ const timelineCards = document.getElementById('timeline-cards');
 
 let map = null;
 let directionsRenderer = null;
+let altRenderers = [];
 let weatherOverlays = [];
 let routeMarkers = [];
 let WeatherOverlay = null;
+let allRoutes = null;
+let selectedRouteIndex = 0;
 
 const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
@@ -43,7 +46,7 @@ function initApp() {
             const pos = projection.fromLatLngToDivPixel(this.position);
             if (pos) {
                 this.div.style.left = (pos.x - 40) + 'px';
-                this.div.style.top = (pos.y - 70) + 'px';
+                this.div.style.top = (pos.y + 10) + 'px';
             }
         }
 
@@ -70,32 +73,42 @@ function initApp() {
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
             suppressMarkers: true,
-            polylineOptions: { strokeColor: '#3182ce', strokeWeight: 5, strokeOpacity: 0.7 }
+            polylineOptions: { strokeColor: '#3182ce', strokeWeight: 5, strokeOpacity: 0.8 }
         });
 
-        const originAutocomplete = new google.maps.places.Autocomplete(originInput, {
-            fields: ['formatted_address', 'geometry', 'name']
-        });
-        const destAutocomplete = new google.maps.places.Autocomplete(destinationInput, {
-            fields: ['formatted_address', 'geometry', 'name']
+        const originSearchBox = new google.maps.places.SearchBox(originInput);
+        const destSearchBox = new google.maps.places.SearchBox(destinationInput);
+
+        map.addListener('bounds_changed', () => {
+            originSearchBox.setBounds(map.getBounds());
+            destSearchBox.setBounds(map.getBounds());
         });
 
-        originAutocomplete.bindTo('bounds', map);
-        destAutocomplete.bindTo('bounds', map);
-
-        originAutocomplete.addListener('place_changed', () => {
-            const place = originAutocomplete.getPlace();
+        originSearchBox.addListener('places_changed', () => {
+            const places = originSearchBox.getPlaces();
+            if (!places || places.length === 0) return;
+            const place = places[0];
             if (place.geometry) {
-                map.panTo(place.geometry.location);
-                map.setZoom(12);
+                if (place.geometry.viewport) {
+                    map.fitBounds(place.geometry.viewport);
+                } else {
+                    map.panTo(place.geometry.location);
+                    map.setZoom(14);
+                }
             }
         });
 
-        destAutocomplete.addListener('place_changed', () => {
-            const place = destAutocomplete.getPlace();
+        destSearchBox.addListener('places_changed', () => {
+            const places = destSearchBox.getPlaces();
+            if (!places || places.length === 0) return;
+            const place = places[0];
             if (place.geometry) {
-                map.panTo(place.geometry.location);
-                map.setZoom(12);
+                if (place.geometry.viewport) {
+                    map.fitBounds(place.geometry.viewport);
+                } else {
+                    map.panTo(place.geometry.location);
+                    map.setZoom(14);
+                }
             }
         });
 
@@ -111,6 +124,8 @@ function clearOverlays() {
     weatherOverlays = [];
     routeMarkers.forEach(m => m.setMap(null));
     routeMarkers = [];
+    altRenderers.forEach(r => r.setMap(null));
+    altRenderers = [];
 }
 
 async function planTrip() {
@@ -132,14 +147,26 @@ async function planTrip() {
     planButton.disabled = true;
     planButton.textContent = 'Loading...';
     weatherTimeline.classList.remove('hidden');
-    timelineCards.innerHTML = '<div class="loading">Calculating route and fetching weather...</div>';
+    timelineCards.innerHTML = '<div class="loading">Calculating routes and fetching weather...</div>';
 
     try {
-        const route = await getRoute(originInput.value, destinationInput.value);
+        const result = await getRoute(originInput.value, destinationInput.value);
+        allRoutes = result;
         const departureDateTime = new Date(`${departureDateInput.value}T${departureTimeInput.value}:00`);
-        const waypoints = sampleWaypoints(route, departureDateTime);
-        const weatherData = await getWeatherForWaypoints(waypoints);
-        displayResults(route, weatherData);
+
+        const routeWeatherData = [];
+        for (let r = 0; r < result.routes.length; r++) {
+            const waypoints = sampleWaypoints(result, r, departureDateTime);
+            const weatherData = await getWeatherForWaypoints(waypoints);
+            const avgTemp = weatherData.reduce((s, w) => s + w.temperature, 0) / weatherData.length;
+            const maxRain = Math.max(...weatherData.map(w => w.precipitationProb));
+            const badWeatherCount = weatherData.filter(w => [55, 61, 63, 65, 66, 67, 71, 73, 75, 80, 81, 82, 85, 86, 95, 96, 99].includes(w.weatherCode)).length;
+            routeWeatherData.push({ routeIndex: r, weatherData, avgTemp, maxRain, badWeatherCount });
+        }
+
+        routeWeatherData.sort((a, b) => a.badWeatherCount - b.badWeatherCount || a.maxRain - b.maxRain);
+
+        displayRouteOptions(result, routeWeatherData, departureDateTime);
     } catch (err) {
         showError('Something went wrong: ' + err.message);
         weatherTimeline.classList.add('hidden');
@@ -157,8 +184,7 @@ function getRoute(origin, destination) {
                 origin: origin,
                 destination: destination,
                 travelMode: google.maps.TravelMode.DRIVING,
-                provideRouteAlternatives: false,
-                optimizeWaypoints: true,
+                provideRouteAlternatives: true,
             },
             (result, status) => {
                 if (status === 'OK') {
@@ -171,8 +197,8 @@ function getRoute(origin, destination) {
     });
 }
 
-function sampleWaypoints(directionsResult, departureTime) {
-    const route = directionsResult.routes[0];
+function sampleWaypoints(directionsResult, routeIndex, departureTime) {
+    const route = directionsResult.routes[routeIndex];
     const leg = route.legs[0];
     const totalDuration = leg.duration.value;
     const totalDistance = leg.distance.value;
@@ -283,19 +309,113 @@ function weatherCodeToInfo(code) {
     return mapping[code] || { icon: '❓', desc: 'Unknown' };
 }
 
-function displayResults(directionsResult, weatherData) {
-    directionsRenderer.setDirections(directionsResult);
+function displayRouteOptions(directionsResult, routeWeatherData, departureDateTime) {
     clearOverlays();
     timelineCards.innerHTML = '';
     weatherTimeline.classList.remove('hidden');
 
+    const routeColors = ['#3182ce', '#d69e2e', '#9f7aea'];
+
+    if (routeWeatherData.length > 1) {
+        const routePicker = document.createElement('div');
+        routePicker.className = 'route-picker';
+        routePicker.innerHTML = '<h3>Choose a Route</h3>';
+
+        routeWeatherData.forEach((rd, idx) => {
+            const route = directionsResult.routes[rd.routeIndex];
+            const leg = route.legs[0];
+            const durationMin = Math.round(leg.duration.value / 60);
+            const hours = Math.floor(durationMin / 60);
+            const mins = durationMin % 60;
+            const distMiles = (leg.distance.value / 1609.34).toFixed(0);
+            const summary = route.summary || `Route ${idx + 1}`;
+            const isBest = idx === 0;
+
+            const renderer = new google.maps.DirectionsRenderer({
+                map: map,
+                directions: directionsResult,
+                routeIndex: rd.routeIndex,
+                suppressMarkers: true,
+                polylineOptions: {
+                    strokeColor: isBest ? routeColors[0] : '#a0aec0',
+                    strokeWeight: isBest ? 5 : 3,
+                    strokeOpacity: isBest ? 0.8 : 0.4,
+                    zIndex: isBest ? 2 : 1,
+                }
+            });
+            altRenderers.push(renderer);
+
+            const btn = document.createElement('button');
+            btn.className = `route-option ${isBest ? 'selected' : ''}`;
+            btn.style.borderLeftColor = routeColors[Math.min(idx, routeColors.length - 1)];
+
+            let weatherLabel = '';
+            if (rd.badWeatherCount === 0 && rd.maxRain <= 20) {
+                weatherLabel = '<span class="weather-badge good">Best Weather</span>';
+            } else if (rd.badWeatherCount > 0) {
+                weatherLabel = `<span class="weather-badge bad">${rd.badWeatherCount} bad stretch${rd.badWeatherCount > 1 ? 'es' : ''}</span>`;
+            } else if (rd.maxRain > 50) {
+                weatherLabel = `<span class="weather-badge warn">Up to ${rd.maxRain}% rain</span>`;
+            }
+
+            btn.innerHTML = `
+                <div class="route-option-top">
+                    <strong>via ${summary}</strong>
+                    ${isBest ? weatherLabel : weatherLabel}
+                </div>
+                <div class="route-option-details">
+                    ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi · Max rain: ${rd.maxRain}%
+                </div>
+            `;
+
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.route-option').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+
+                altRenderers.forEach((r, ri) => {
+                    r.setOptions({
+                        polylineOptions: {
+                            strokeColor: ri === idx ? routeColors[0] : '#a0aec0',
+                            strokeWeight: ri === idx ? 5 : 3,
+                            strokeOpacity: ri === idx ? 0.8 : 0.4,
+                            zIndex: ri === idx ? 2 : 1,
+                        }
+                    });
+                });
+
+                showWeatherCards(rd.weatherData);
+                showOverlaysOnMap(rd.weatherData);
+            });
+
+            routePicker.appendChild(btn);
+        });
+
+        timelineCards.appendChild(routePicker);
+    }
+
+    showWeatherCards(routeWeatherData[0].weatherData);
+    showOverlaysOnMap(routeWeatherData[0].weatherData);
+
+    if (routeWeatherData.length <= 1) {
+        directionsRenderer.setDirections(directionsResult);
+    }
+
     const bounds = new google.maps.LatLngBounds();
+    routeWeatherData[0].weatherData.forEach(wp => {
+        bounds.extend(new google.maps.LatLng(wp.lat, wp.lon));
+    });
+    map.fitBounds(bounds, { top: 80, left: 340, right: 40, bottom: 40 });
+}
+
+function showOverlaysOnMap(weatherData) {
+    weatherOverlays.forEach(o => o.setMap(null));
+    weatherOverlays = [];
+    routeMarkers.forEach(m => m.setMap(null));
+    routeMarkers = [];
 
     weatherData.forEach((wp, i) => {
         const info = weatherCodeToInfo(wp.weatherCode);
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-        const label = wp.isStart ? 'Departure' : wp.isEnd ? 'Arrival' : `${wp.distanceMiles} mi`;
         const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
 
         const overlayHtml = `
@@ -310,7 +430,6 @@ function displayResults(directionsResult, weatherData) {
         const position = new google.maps.LatLng(wp.lat, wp.lon);
         const overlay = new WeatherOverlay(position, overlayHtml, map);
         weatherOverlays.push(overlay);
-        bounds.extend(position);
 
         const marker = new google.maps.Marker({
             position: { lat: wp.lat, lng: wp.lon },
@@ -319,6 +438,7 @@ function displayResults(directionsResult, weatherData) {
             zIndex: 0,
         });
 
+        const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const infoContent = `
             <div style="font-family: sans-serif; min-width: 180px;">
                 <h3 style="margin:0 0 6px 0; font-size:1rem;">${wp.locationName}</h3>
@@ -332,6 +452,25 @@ function displayResults(directionsResult, weatherData) {
         const infoWindow = new google.maps.InfoWindow({ content: infoContent });
         marker.addListener('click', () => infoWindow.open({ anchor: marker, map }));
         routeMarkers.push(marker);
+    });
+}
+
+function showWeatherCards(weatherData) {
+    let cardsContainer = document.getElementById('weather-cards-list');
+    if (cardsContainer) {
+        cardsContainer.innerHTML = '';
+    } else {
+        cardsContainer = document.createElement('div');
+        cardsContainer.id = 'weather-cards-list';
+        timelineCards.appendChild(cardsContainer);
+    }
+
+    weatherData.forEach((wp, i) => {
+        const info = weatherCodeToInfo(wp.weatherCode);
+        const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+        const label = wp.isStart ? 'Departure' : wp.isEnd ? 'Arrival' : `${wp.distanceMiles} mi`;
+        const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
 
         const card = document.createElement('div');
         card.className = `weather-card ${cardClass}`;
@@ -355,13 +494,16 @@ function displayResults(directionsResult, weatherData) {
         card.addEventListener('click', () => {
             map.panTo({ lat: wp.lat, lng: wp.lon });
             map.setZoom(10);
-            infoWindow.open({ anchor: marker, map });
+            setTimeout(() => {
+                const marker = routeMarkers[i];
+                if (marker) {
+                    google.maps.event.trigger(marker, 'click');
+                }
+            }, 300);
         });
         card.style.cursor = 'pointer';
-        timelineCards.appendChild(card);
+        cardsContainer.appendChild(card);
     });
-
-    map.fitBounds(bounds, { top: 80, left: 340, right: 40, bottom: 40 });
 }
 
 function showError(msg) {
