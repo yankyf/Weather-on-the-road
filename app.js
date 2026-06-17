@@ -25,10 +25,11 @@ departureTimeInput.value = now.toTimeString().slice(0, 5);
 
 function initApp() {
     WeatherOverlay = class extends google.maps.OverlayView {
-        constructor(position, content, mapInstance) {
+        constructor(position, content, detailContent, mapInstance) {
             super();
             this.position = position;
             this.content = content;
+            this.detailContent = detailContent;
             this.div = null;
             this.setMap(mapInstance);
         }
@@ -38,15 +39,14 @@ function initApp() {
             this.div.innerHTML = this.content;
             this.div.style.position = 'absolute';
             this.div.style.zIndex = '1';
+            const detail = this.div.querySelector('.overlay-detail');
             this.div.addEventListener('mouseenter', () => {
                 this.div.style.zIndex = '9999';
-                this.div.querySelector('.weather-overlay').style.transform = 'scale(1.15)';
-                this.div.querySelector('.weather-overlay').style.boxShadow = '0 4px 16px rgba(0,0,0,0.4)';
+                if (detail) detail.style.display = 'block';
             });
             this.div.addEventListener('mouseleave', () => {
                 this.div.style.zIndex = '1';
-                this.div.querySelector('.weather-overlay').style.transform = 'scale(1)';
-                this.div.querySelector('.weather-overlay').style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+                if (detail) detail.style.display = 'none';
             });
             this.getPanes().overlayMouseTarget.appendChild(this.div);
         }
@@ -55,8 +55,8 @@ function initApp() {
             const projection = this.getProjection();
             const pos = projection.fromLatLngToDivPixel(this.position);
             if (pos) {
-                this.div.style.left = (pos.x - 40) + 'px';
-                this.div.style.top = (pos.y + 10) + 'px';
+                this.div.style.left = (pos.x - 20) + 'px';
+                this.div.style.top = (pos.y + 5) + 'px';
             }
         }
 
@@ -73,7 +73,7 @@ function initApp() {
             center: { lat: 39.8283, lng: -98.5795 },
             zoom: 5,
             gestureHandling: 'greedy',
-            mapTypeControl: true,
+            mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: false,
             zoomControlOptions: {
@@ -172,7 +172,8 @@ async function planTrip() {
             const withForecast = weatherData.filter(w => !w.noForecast);
             const maxRain = withForecast.length ? Math.max(...withForecast.map(w => w.precipitationProb)) : 0;
             const badWeatherCount = withForecast.filter(w => [55, 61, 63, 65, 66, 67, 71, 73, 75, 80, 81, 82, 85, 86, 95, 96, 99].includes(w.weatherCode)).length;
-            routeWeatherData.push({ routeIndex: r, weatherData, maxRain, badWeatherCount });
+            const alerts = getWeatherAlerts(weatherData);
+            routeWeatherData.push({ routeIndex: r, weatherData, maxRain, badWeatherCount, alerts });
         }
 
         routeWeatherData.sort((a, b) => a.badWeatherCount - b.badWeatherCount || a.maxRain - b.maxRain);
@@ -184,6 +185,38 @@ async function planTrip() {
         planButton.disabled = false;
         planButton.textContent = 'Go';
     }
+}
+
+function getWeatherAlerts(weatherData) {
+    const alerts = [];
+    const withForecast = weatherData.filter(w => !w.noForecast);
+
+    for (const wp of withForecast) {
+        const info = weatherCodeToInfo(wp.weatherCode);
+        const cat = getWeatherCategory(wp.weatherCode);
+
+        if (cat === 'storm') {
+            alerts.push({ type: 'danger', icon: '⚡', text: `${info.desc} near ${wp.locationName}`, location: wp.locationName });
+        } else if (cat === 'snow') {
+            alerts.push({ type: 'warning', icon: '🌨️', text: `${info.desc} near ${wp.locationName}`, location: wp.locationName });
+        } else if (wp.weatherCode === 65 || wp.weatherCode === 82) {
+            alerts.push({ type: 'warning', icon: '🌧️', text: `${info.desc} near ${wp.locationName}`, location: wp.locationName });
+        } else if (wp.weatherCode === 45 || wp.weatherCode === 48) {
+            alerts.push({ type: 'caution', icon: '🌫️', text: `${info.desc} near ${wp.locationName}`, location: wp.locationName });
+        }
+
+        if (wp.windSpeed >= 30) {
+            alerts.push({ type: 'warning', icon: '💨', text: `High winds (${Math.round(wp.windSpeed)} mph) near ${wp.locationName}`, location: wp.locationName });
+        }
+
+        if (wp.temperature <= 32) {
+            alerts.push({ type: 'caution', icon: '🥶', text: `Freezing temps (${Math.round(wp.temperature)}°F) near ${wp.locationName}`, location: wp.locationName });
+        } else if (wp.temperature >= 100) {
+            alerts.push({ type: 'caution', icon: '🔥', text: `Extreme heat (${Math.round(wp.temperature)}°F) near ${wp.locationName}`, location: wp.locationName });
+        }
+    }
+
+    return alerts;
 }
 
 function getRoute(origin, destination) {
@@ -264,10 +297,16 @@ async function getWeatherForWaypoints(waypoints) {
 
 const weatherCategories = {
     clear: { label: 'Clear', color: '#48bb78', icon: '☀️', codes: [0, 1] },
-    cloudy: { label: 'Cloudy', color: '#a0aec0', icon: '☁️', codes: [2, 3, 45, 48] },
-    rain: { label: 'Rain', color: '#4299e1', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
-    snow: { label: 'Snow', color: '#90cdf4', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
-    storm: { label: 'Storm', color: '#fc8181', icon: '⚡', codes: [95, 96, 99] },
+    cloudy: { label: 'Cloudy', color: '#b0b8c4', icon: '☁️', codes: [2, 3, 45, 48] },
+    rain: { label: 'Rain', color: '#667eea', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
+    snow: { label: 'Snow', color: '#a78bfa', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
+    storm: { label: 'Storm', color: '#e53e3e', icon: '⚡', codes: [95, 96, 99] },
+};
+
+const trafficColors = {
+    free: '#38a169',
+    moderate: '#dd6b20',
+    heavy: '#c53030',
 };
 
 function getWeatherCategory(code) {
@@ -323,12 +362,11 @@ function getStepTrafficSegments(route) {
     const overallRatio = totalTraffic / totalDuration;
 
     if (!leg.duration_in_traffic || overallRatio <= 1.02) {
-        return { segments: [{ pct: 100, color: '#48bb78' }], label: 'Clear', labelColor: '#48bb78', delayMin: 0 };
+        return { segments: [{ pct: 100, color: trafficColors.free }], label: 'Clear', labelColor: trafficColors.free, delayMin: 0 };
     }
 
     const delayMin = Math.round((totalTraffic - totalDuration) / 60);
     const rawSegments = [];
-    let cumDuration = 0;
 
     for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
@@ -338,12 +376,11 @@ function getStepTrafficSegments(route) {
         const speedKmh = durationHr > 0 ? distKm / durationHr : 100;
 
         let color;
-        if (speedKmh >= 80) color = '#48bb78';
-        else if (speedKmh >= 40) color = '#ecc94b';
-        else color = '#fc8181';
+        if (speedKmh >= 70) color = trafficColors.free;
+        else if (speedKmh >= 30) color = trafficColors.moderate;
+        else color = trafficColors.heavy;
 
         rawSegments.push({ pct: stepPct, color });
-        cumDuration += step.duration.value;
     }
 
     const merged = [];
@@ -354,9 +391,9 @@ function getStepTrafficSegments(route) {
     }
 
     let label, labelColor;
-    if (overallRatio <= 1.1) { label = `Light (+${delayMin} min)`; labelColor = '#48bb78'; }
-    else if (overallRatio <= 1.25) { label = `Moderate (+${delayMin} min)`; labelColor = '#ecc94b'; }
-    else { label = `Heavy (+${delayMin} min)`; labelColor = '#fc8181'; }
+    if (overallRatio <= 1.1) { label = `Light (+${delayMin} min)`; labelColor = trafficColors.free; }
+    else if (overallRatio <= 1.25) { label = `Moderate (+${delayMin} min)`; labelColor = trafficColors.moderate; }
+    else { label = `Heavy (+${delayMin} min)`; labelColor = trafficColors.heavy; }
 
     return { segments: merged, label, labelColor, delayMin };
 }
@@ -369,7 +406,7 @@ function drawRouteWithTraffic(route, routeColor, isSelected) {
     if (!isSelected) {
         const path = route.overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }));
         const line = new google.maps.Polyline({
-            path, map, strokeColor: '#a0aec0', strokeWeight: 3, strokeOpacity: 0.35, zIndex: 1
+            path, map, strokeColor: routeColor, strokeWeight: 4, strokeOpacity: 0.3, zIndex: 1
         });
         polylines.push(line);
         return polylines;
@@ -377,7 +414,7 @@ function drawRouteWithTraffic(route, routeColor, isSelected) {
 
     const basePath = route.overview_path.map(p => ({ lat: p.lat(), lng: p.lng() }));
     const baseLine = new google.maps.Polyline({
-        path: basePath, map, strokeColor: routeColor, strokeWeight: 6, strokeOpacity: 0.3, zIndex: 5
+        path: basePath, map, strokeColor: routeColor, strokeWeight: 6, strokeOpacity: 0.7, zIndex: 5
     });
     polylines.push(baseLine);
 
@@ -385,25 +422,25 @@ function drawRouteWithTraffic(route, routeColor, isSelected) {
     const hasTraffic = !!leg.duration_in_traffic;
     const overallRatio = hasTraffic ? leg.duration_in_traffic.value / totalDuration : 1;
 
-    for (const step of steps) {
-        const path = step.path || google.maps.geometry?.encoding?.decodePath(step.polyline?.points) || [];
-        if (path.length < 2) continue;
+    if (hasTraffic && overallRatio > 1.02) {
+        for (const step of steps) {
+            const path = step.path || [];
+            if (path.length < 2) continue;
 
-        const distKm = step.distance.value / 1000;
-        const durationHr = step.duration.value / 3600;
-        const speedKmh = durationHr > 0 ? distKm / durationHr : 100;
+            const distKm = step.distance.value / 1000;
+            const durationHr = step.duration.value / 3600;
+            const speedKmh = durationHr > 0 ? distKm / durationHr : 100;
 
-        let color;
-        if (!hasTraffic || overallRatio <= 1.02) color = routeColor;
-        else if (speedKmh >= 80) color = '#48bb78';
-        else if (speedKmh >= 40) color = '#ecc94b';
-        else color = '#fc8181';
+            if (speedKmh >= 70) continue;
 
-        const stepPath = path.map(p => ({ lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng }));
-        const line = new google.maps.Polyline({
-            path: stepPath, map, strokeColor: color, strokeWeight: 5, strokeOpacity: 0.9, zIndex: 10
-        });
-        polylines.push(line);
+            const color = speedKmh >= 30 ? trafficColors.moderate : trafficColors.heavy;
+
+            const stepPath = path.map(p => ({ lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng }));
+            const line = new google.maps.Polyline({
+                path: stepPath, map, strokeColor: color, strokeWeight: 6, strokeOpacity: 0.85, zIndex: 12
+            });
+            polylines.push(line);
+        }
     }
 
     return polylines;
@@ -453,6 +490,17 @@ function displayRouteOptions(directionsResult, routeWeatherData) {
             const traffic = getStepTrafficSegments(route);
             const trafficBarHtml = traffic.segments.map(s => `<div style="flex:${s.pct};background:${s.color};height:100%;"></div>`).join('');
 
+            let alertsHtml = '';
+            if (rd.alerts.length > 0) {
+                const alertItems = rd.alerts.map(a => {
+                    let cls = 'alert-caution';
+                    if (a.type === 'danger') cls = 'alert-danger';
+                    else if (a.type === 'warning') cls = 'alert-warning';
+                    return `<div class="route-alert ${cls}">${a.icon} ${a.text}</div>`;
+                }).join('');
+                alertsHtml = `<div class="route-alerts">${alertItems}</div>`;
+            }
+
             const btn = document.createElement('button');
             btn.className = `route-option ${isBest ? 'selected' : ''}`;
             btn.innerHTML = `
@@ -464,10 +512,11 @@ function displayRouteOptions(directionsResult, routeWeatherData) {
                     </div>
                     <div class="route-option-details">${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi</div>
                     <div class="route-bars">
-                        <div class="bar-row"><span class="bar-label">🌤 Weather</span><div class="weather-bar-container"><div class="weather-bar">${barHtml}</div></div></div>
+                        <div class="bar-row"><span class="bar-label">Weather</span><div class="weather-bar-container"><div class="weather-bar">${barHtml}</div></div></div>
                         <div class="weather-bar-legend">${legendHtml}</div>
-                        <div class="bar-row"><span class="bar-label">🚗 Traffic</span><div class="weather-bar-container"><div class="weather-bar">${trafficBarHtml}</div></div><span class="traffic-text" style="color:${traffic.labelColor}">${traffic.label}</span></div>
+                        <div class="bar-row"><span class="bar-label">Traffic</span><div class="weather-bar-container"><div class="weather-bar">${trafficBarHtml}</div></div><span class="traffic-text" style="color:${traffic.labelColor}">${traffic.label}</span></div>
                     </div>
+                    ${alertsHtml}
                 </div>
                 <div class="route-check"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             `;
@@ -505,24 +554,22 @@ function showOverlaysOnMap(weatherData) {
     weatherData.forEach((wp, i) => {
         const info = wp.noForecast ? { icon: '—', desc: 'No forecast available' } : weatherCodeToInfo(wp.weatherCode);
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
-        const tempDisplay = wp.noForecast ? 'N/A' : `${Math.round(wp.temperature)}°F`;
+        const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+        const tempDisplay = wp.noForecast ? '?' : `${Math.round(wp.temperature)}°`;
 
-        const overlayHtml = `<div class="weather-overlay ${cardClass}${wp.noForecast ? ' no-forecast' : ''}"><div class="overlay-icon">${info.icon}</div><div class="overlay-temp">${tempDisplay}</div><div class="overlay-label">${wp.locationName}</div><div class="overlay-time">${timeStr}</div></div>`;
+        let detailHtml = '';
+        if (wp.noForecast) {
+            detailHtml = `<div class="overlay-detail"><strong>${wp.locationName}</strong><br><span>${timeStr} · ${dateStr}</span><br><span style="color:#999">No forecast</span></div>`;
+        } else {
+            detailHtml = `<div class="overlay-detail"><strong>${wp.locationName}</strong><br><span>${timeStr} · ${dateStr}</span><br><span>${info.desc}</span><br><span>Wind: ${Math.round(wp.windSpeed)} mph</span>${wp.precipitationProb > 0 ? `<br><span>${wp.precipitationProb}% precip</span>` : ''}</div>`;
+        }
 
-        const overlay = new WeatherOverlay(new google.maps.LatLng(wp.lat, wp.lon), overlayHtml, map);
+        const overlayHtml = `<div class="weather-overlay-minimal${wp.noForecast ? ' no-forecast' : ''}"><span class="overlay-icon-mini">${info.icon}</span><span class="overlay-temp-mini">${tempDisplay}</span>${detailHtml}</div>`;
+
+        const overlay = new WeatherOverlay(new google.maps.LatLng(wp.lat, wp.lon), overlayHtml, null, map);
         weatherOverlays.push(overlay);
 
         const marker = new google.maps.Marker({ position: { lat: wp.lat, lng: wp.lon }, map, opacity: 0, zIndex: 0 });
-        const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-        let infoContent;
-        if (wp.noForecast) {
-            infoContent = `<div style="font-family:sans-serif;min-width:180px;"><h3 style="margin:0 0 6px 0;font-size:1rem;">${wp.locationName}</h3><p style="margin:0;font-size:0.85rem;color:#666;">${timeStr} · ${dateStr}</p><p style="margin:6px 0;font-size:0.95rem;color:#999;">Forecast not available this far ahead</p></div>`;
-        } else {
-            infoContent = `<div style="font-family:sans-serif;min-width:180px;"><h3 style="margin:0 0 6px 0;font-size:1rem;">${wp.locationName}</h3><p style="margin:0;font-size:0.85rem;color:#666;">${timeStr} · ${dateStr}</p><p style="margin:6px 0;font-size:1.3rem;">${info.icon} ${Math.round(wp.temperature)}°F — ${info.desc}</p><p style="margin:0;font-size:0.8rem;color:#888;">Wind: ${Math.round(wp.windSpeed)} mph · Humidity: ${wp.humidity}%${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% chance of precipitation` : ''}</p></div>`;
-        }
-        const infoWindow = new google.maps.InfoWindow({ content: infoContent });
-        marker.addListener('click', () => infoWindow.open({ anchor: marker, map }));
         routeMarkers.push(marker);
     });
 }
@@ -550,7 +597,6 @@ function showWeatherCards(weatherData) {
         card.addEventListener('click', () => {
             map.panTo({ lat: wp.lat, lng: wp.lon });
             map.setZoom(10);
-            setTimeout(() => { const marker = routeMarkers[i]; if (marker) google.maps.event.trigger(marker, 'click'); }, 300);
         });
         cardsContainer.appendChild(card);
     });

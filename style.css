@@ -33,59 +33,6 @@ header h1 {
     color: #2b6cb0;
 }
 
-.api-key-banner {
-    background: #fffbeb;
-    border: 1px solid #f6e05e;
-    border-radius: 12px;
-    padding: 20px 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.api-key-banner p {
-    color: #744210;
-    margin-bottom: 10px;
-}
-
-.api-key-banner .api-key-help {
-    font-size: 0.85rem;
-    color: #975a16;
-    margin-top: 10px;
-    margin-bottom: 0;
-}
-
-.api-key-banner a {
-    color: #2b6cb0;
-}
-
-.api-key-row {
-    display: flex;
-    gap: 10px;
-}
-
-.api-key-row input {
-    flex: 1;
-    padding: 8px 12px;
-    border: 2px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 0.95rem;
-}
-
-.api-key-row button {
-    padding: 8px 16px;
-    background: #d69e2e;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.api-key-row button:hover {
-    background: #b7791f;
-}
-
 /* Map and search panel */
 #map-container {
     flex: 1;
@@ -161,7 +108,7 @@ header h1 {
     padding: 8px 10px;
     border: 1.5px solid #e2e8f0;
     border-radius: 6px;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
 }
 
 .search-field input:focus {
@@ -176,6 +123,13 @@ header h1 {
 
 .search-field.small {
     flex: 1;
+    min-width: 0;
+}
+
+.search-field.small input {
+    min-width: 0;
+    font-size: 0.8rem;
+    padding: 8px 6px;
 }
 
 #plan-trip {
@@ -200,59 +154,53 @@ header h1 {
     cursor: not-allowed;
 }
 
-/* Weather overlays on the map */
-.weather-overlay {
-    background: white;
-    border-radius: 10px;
-    padding: 6px 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    text-align: center;
+/* Minimal weather overlays on the map */
+.weather-overlay-minimal {
+    display: flex;
+    align-items: center;
+    gap: 2px;
     cursor: pointer;
-    transition: transform 0.15s;
-    border: 2px solid #4299e1;
-    min-width: 70px;
+    position: relative;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
 }
 
-.weather-overlay:hover {
-    transform: scale(1.1);
-}
-
-.weather-overlay.start {
-    border-color: #38a169;
-}
-
-.weather-overlay.end {
-    border-color: #e53e3e;
-}
-
-.weather-overlay .overlay-icon {
-    font-size: 1.5rem;
+.weather-overlay-minimal .overlay-icon-mini {
+    font-size: 1.3rem;
     line-height: 1;
 }
 
-.weather-overlay .overlay-temp {
+.weather-overlay-minimal .overlay-temp-mini {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.8rem;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5);
+}
+
+.weather-overlay-minimal.no-forecast {
+    opacity: 0.4;
+}
+
+.overlay-detail {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 4px;
+    background: white;
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+    font-size: 0.78rem;
     color: #2d3748;
-}
-
-.weather-overlay .overlay-label {
-    font-size: 0.65rem;
-    color: #718096;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 80px;
+    z-index: 10000;
+    line-height: 1.5;
 }
 
-.weather-overlay .overlay-time {
-    font-size: 0.6rem;
-    color: #a0aec0;
-}
-
-.weather-overlay.no-forecast {
-    opacity: 0.5;
-    border-color: #cbd5e0;
+.overlay-detail strong {
+    font-size: 0.85rem;
+    color: #1a202c;
 }
 
 /* Error */
@@ -450,7 +398,7 @@ header h1 {
     font-size: 0.7rem;
     color: #718096;
     white-space: nowrap;
-    min-width: 68px;
+    min-width: 52px;
 }
 
 .weather-bar-container {
@@ -469,44 +417,48 @@ header h1 {
 
 .weather-bar-legend {
     margin-top: 3px;
-    margin-left: 76px;
+    margin-left: 60px;
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-}
-
-.traffic-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 6px;
-}
-
-.traffic-label {
-    font-size: 0.7rem;
-    color: #718096;
-    white-space: nowrap;
-    min-width: 68px;
-}
-
-.traffic-bar-wrap {
-    flex: 1;
-    height: 8px;
-    background: #edf2f7;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.traffic-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 0.3s;
 }
 
 .traffic-text {
     font-size: 0.7rem;
     font-weight: 600;
     white-space: nowrap;
+}
+
+/* Route alerts */
+.route-alerts {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.route-alert {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.route-alert.alert-danger {
+    background: #fed7d7;
+    color: #9b2c2c;
+}
+
+.route-alert.alert-warning {
+    background: #fefcbf;
+    color: #744210;
+}
+
+.route-alert.alert-caution {
+    background: #e2e8f0;
+    color: #4a5568;
 }
 
 .route-check {
