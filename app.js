@@ -38,6 +38,10 @@ function initApp() {
             this.div = document.createElement('div');
             this.div.innerHTML = this.content;
             this.div.style.position = 'absolute';
+            this.div.style.zIndex = '1';
+            this.div.style.transition = 'z-index 0s';
+            this.div.addEventListener('mouseenter', () => { this.div.style.zIndex = '999'; });
+            this.div.addEventListener('mouseleave', () => { this.div.style.zIndex = '1'; });
             this.getPanes().floatPane.appendChild(this.div);
         }
 
@@ -310,19 +314,34 @@ function weatherCodeToInfo(code) {
 }
 
 function getWeatherBreakdown(weatherData) {
-    const total = weatherData.length;
-    const sunny = weatherData.filter(w => [0, 1].includes(w.weatherCode)).length;
-    const cloudy = weatherData.filter(w => [2, 3, 45, 48].includes(w.weatherCode)).length;
-    const rainy = weatherData.filter(w => [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(w.weatherCode)).length;
-    const snow = weatherData.filter(w => [66, 67, 71, 73, 75, 77, 85, 86].includes(w.weatherCode)).length;
-    const storm = weatherData.filter(w => [95, 96, 99].includes(w.weatherCode)).length;
+    const categories = {
+        clear: { label: 'Clear', color: '#f6e05e', icon: '☀️', codes: [0, 1] },
+        cloudy: { label: 'Cloudy', color: '#cbd5e0', icon: '☁️', codes: [2, 3, 45, 48] },
+        rain: { label: 'Rain', color: '#63b3ed', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
+        snow: { label: 'Snow', color: '#b2d8f7', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
+        storm: { label: 'Storm', color: '#fc8181', icon: '⚡', codes: [95, 96, 99] },
+    };
+
+    const segments = [];
+    for (let i = 0; i < weatherData.length - 1; i++) {
+        const timeDiff = weatherData[i + 1].arrivalTime - weatherData[i].arrivalTime;
+        let cat = 'clear';
+        for (const [key, val] of Object.entries(categories)) {
+            if (val.codes.includes(weatherData[i].weatherCode)) { cat = key; break; }
+        }
+        segments.push({ cat, duration: timeDiff });
+    }
+    const totalTime = segments.reduce((s, seg) => s + seg.duration, 0) || 1;
+
+    const sums = {};
+    segments.forEach(seg => { sums[seg.cat] = (sums[seg.cat] || 0) + seg.duration; });
 
     const parts = [];
-    if (sunny > 0) parts.push({ label: 'Clear', pct: Math.round(sunny / total * 100), color: '#f6e05e', icon: '☀️' });
-    if (cloudy > 0) parts.push({ label: 'Cloudy', pct: Math.round(cloudy / total * 100), color: '#cbd5e0', icon: '☁️' });
-    if (rainy > 0) parts.push({ label: 'Rain', pct: Math.round(rainy / total * 100), color: '#63b3ed', icon: '🌧️' });
-    if (snow > 0) parts.push({ label: 'Snow', pct: Math.round(snow / total * 100), color: '#e2e8f0', icon: '🌨️' });
-    if (storm > 0) parts.push({ label: 'Storm', pct: Math.round(storm / total * 100), color: '#fc8181', icon: '⚡' });
+    for (const [key, val] of Object.entries(categories)) {
+        if (sums[key]) {
+            parts.push({ ...val, pct: Math.round(sums[key] / totalTime * 100) });
+        }
+    }
     return parts;
 }
 
@@ -486,7 +505,7 @@ function showOverlaysOnMap(weatherData) {
                 <p style="margin:0; font-size:0.85rem; color:#666;">${timeStr} · ${dateStr}</p>
                 <p style="margin:6px 0; font-size:1.3rem;">${info.icon} ${Math.round(wp.temperature)}°F — ${info.desc}</p>
                 <p style="margin:0; font-size:0.8rem; color:#888;">
-                    Wind: ${Math.round(wp.windSpeed)} mph · Rain: ${wp.precipitationProb}% · Humidity: ${wp.humidity}%
+                    💨 ${Math.round(wp.windSpeed)} mph · 🌧 ${wp.precipitationProb}% chance of rain · 💧 ${wp.humidity}% humidity
                 </p>
             </div>
         `;
@@ -526,9 +545,9 @@ function showWeatherCards(weatherData) {
                 <div class="temp">${Math.round(wp.temperature)}°F</div>
                 <div class="description">${info.desc}</div>
                 <div class="extra">
-                    Wind: ${Math.round(wp.windSpeed)} mph ·
-                    Rain: ${wp.precipitationProb}% ·
-                    Humidity: ${wp.humidity}%
+                    💨 ${Math.round(wp.windSpeed)} mph ·
+                    🌧 ${wp.precipitationProb}% chance ·
+                    💧 ${wp.humidity}% humidity
                 </div>
             </div>
         `;
