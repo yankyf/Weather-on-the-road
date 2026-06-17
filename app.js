@@ -20,7 +20,7 @@ const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
 departureDateInput.min = today.toISOString().split('T')[0];
 const maxDate = new Date(today);
-maxDate.setDate(maxDate.getDate() + 14);
+maxDate.setDate(maxDate.getDate() + 16);
 departureDateInput.max = maxDate.toISOString().split('T')[0];
 
 function initApp() {
@@ -181,9 +181,10 @@ async function planTrip() {
         for (let r = 0; r < result.routes.length; r++) {
             const waypoints = sampleWaypoints(result, r, departureDateTime);
             const weatherData = await getWeatherForWaypoints(waypoints);
-            const avgTemp = weatherData.reduce((s, w) => s + w.temperature, 0) / weatherData.length;
-            const maxRain = Math.max(...weatherData.map(w => w.precipitationProb));
-            const badWeatherCount = weatherData.filter(w => [55, 61, 63, 65, 66, 67, 71, 73, 75, 80, 81, 82, 85, 86, 95, 96, 99].includes(w.weatherCode)).length;
+            const withForecast = weatherData.filter(w => !w.noForecast);
+            const avgTemp = withForecast.length ? withForecast.reduce((s, w) => s + w.temperature, 0) / withForecast.length : null;
+            const maxRain = withForecast.length ? Math.max(...withForecast.map(w => w.precipitationProb)) : 0;
+            const badWeatherCount = withForecast.filter(w => [55, 61, 63, 65, 66, 67, 71, 73, 75, 80, 81, 82, 85, 86, 95, 96, 99].includes(w.weatherCode)).length;
             routeWeatherData.push({ routeIndex: r, weatherData, avgTemp, maxRain, badWeatherCount });
         }
 
@@ -287,19 +288,44 @@ async function getWeatherForWaypoints(waypoints) {
         const hour = wp.arrivalTime.getHours();
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${wp.lat}&longitude=${wp.lon}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`;
 
-        const res = await fetch(url);
-        const data = await res.json();
-        const hourIndex = Math.min(hour, (data.hourly.time || []).length - 1);
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.error || !data.hourly || !data.hourly.temperature_2m) {
+                return {
+                    ...wp,
+                    locationName: locationNames[i],
+                    temperature: null,
+                    humidity: null,
+                    precipitationProb: null,
+                    weatherCode: null,
+                    windSpeed: null,
+                    noForecast: true,
+                };
+            }
+            const hourIndex = Math.min(hour, (data.hourly.time || []).length - 1);
 
-        return {
-            ...wp,
-            locationName: locationNames[i],
-            temperature: data.hourly.temperature_2m[hourIndex],
-            humidity: data.hourly.relative_humidity_2m[hourIndex],
-            precipitationProb: data.hourly.precipitation_probability[hourIndex],
-            weatherCode: data.hourly.weathercode[hourIndex],
-            windSpeed: data.hourly.windspeed_10m[hourIndex],
-        };
+            return {
+                ...wp,
+                locationName: locationNames[i],
+                temperature: data.hourly.temperature_2m[hourIndex],
+                humidity: data.hourly.relative_humidity_2m[hourIndex],
+                precipitationProb: data.hourly.precipitation_probability[hourIndex],
+                weatherCode: data.hourly.weathercode[hourIndex],
+                windSpeed: data.hourly.windspeed_10m[hourIndex],
+            };
+        } catch (e) {
+            return {
+                ...wp,
+                locationName: locationNames[i],
+                temperature: null,
+                humidity: null,
+                precipitationProb: null,
+                weatherCode: null,
+                windSpeed: null,
+                noForecast: true,
+            };
+        }
     });
 
     return Promise.all(weatherPromises);
@@ -314,6 +340,7 @@ const weatherCategories = {
 };
 
 function getWeatherCategory(code) {
+    if (code === null || code === undefined) return 'unknown';
     for (const [key, val] of Object.entries(weatherCategories)) {
         if (val.codes.includes(code)) return key;
     }
@@ -359,7 +386,8 @@ function buildWeatherBar(weatherData) {
         const startPct = weatherData[i].fraction * 100;
         const endPct = weatherData[i + 1].fraction * 100;
         const widthPct = endPct - startPct;
-        const info = weatherCategories[cat];
+        const unknownInfo = { label: 'No forecast', color: '#e2e8f0', icon: '—' };
+        const info = cat === 'unknown' ? unknownInfo : weatherCategories[cat];
         segments.push({
             width: widthPct,
             color: info.color,
@@ -502,14 +530,16 @@ function showOverlaysOnMap(weatherData) {
     routeMarkers = [];
 
     weatherData.forEach((wp, i) => {
-        const info = weatherCodeToInfo(wp.weatherCode);
+        const info = wp.noForecast ? { icon: '—', desc: 'No forecast available' } : weatherCodeToInfo(wp.weatherCode);
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
 
+        const tempDisplay = wp.noForecast ? 'N/A' : `${Math.round(wp.temperature)}°F`;
+
         const overlayHtml = `
-            <div class="weather-overlay ${cardClass}">
+            <div class="weather-overlay ${cardClass}${wp.noForecast ? ' no-forecast' : ''}">
                 <div class="overlay-icon">${info.icon}</div>
-                <div class="overlay-temp">${Math.round(wp.temperature)}°F</div>
+                <div class="overlay-temp">${tempDisplay}</div>
                 <div class="overlay-label">${wp.locationName}</div>
                 <div class="overlay-time">${timeStr}</div>
             </div>
@@ -527,17 +557,28 @@ function showOverlaysOnMap(weatherData) {
         });
 
         const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-        const infoContent = `
-            <div style="font-family: sans-serif; min-width: 180px;">
-                <h3 style="margin:0 0 6px 0; font-size:1rem;">${wp.locationName}</h3>
-                <p style="margin:0; font-size:0.85rem; color:#666;">${timeStr} · ${dateStr}</p>
-                <p style="margin:6px 0; font-size:1.3rem;">${info.icon} ${Math.round(wp.temperature)}°F — ${info.desc}</p>
-                <p style="margin:0; font-size:0.8rem; color:#888;">
-                    Wind: ${Math.round(wp.windSpeed)} mph · Humidity: ${wp.humidity}%
-                    ${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% chance of precipitation` : ''}
-                </p>
-            </div>
-        `;
+        let infoContent;
+        if (wp.noForecast) {
+            infoContent = `
+                <div style="font-family: sans-serif; min-width: 180px;">
+                    <h3 style="margin:0 0 6px 0; font-size:1rem;">${wp.locationName}</h3>
+                    <p style="margin:0; font-size:0.85rem; color:#666;">${timeStr} · ${dateStr}</p>
+                    <p style="margin:6px 0; font-size:0.95rem; color:#999;">Forecast not available this far ahead (max 16 days)</p>
+                </div>
+            `;
+        } else {
+            infoContent = `
+                <div style="font-family: sans-serif; min-width: 180px;">
+                    <h3 style="margin:0 0 6px 0; font-size:1rem;">${wp.locationName}</h3>
+                    <p style="margin:0; font-size:0.85rem; color:#666;">${timeStr} · ${dateStr}</p>
+                    <p style="margin:6px 0; font-size:1.3rem;">${info.icon} ${Math.round(wp.temperature)}°F — ${info.desc}</p>
+                    <p style="margin:0; font-size:0.8rem; color:#888;">
+                        Wind: ${Math.round(wp.windSpeed)} mph · Humidity: ${wp.humidity}%
+                        ${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% chance of precipitation` : ''}
+                    </p>
+                </div>
+            `;
+        }
         const infoWindow = new google.maps.InfoWindow({ content: infoContent });
         marker.addListener('click', () => infoWindow.open({ anchor: marker, map }));
         routeMarkers.push(marker);
@@ -555,7 +596,7 @@ function showWeatherCards(weatherData) {
     }
 
     weatherData.forEach((wp, i) => {
-        const info = weatherCodeToInfo(wp.weatherCode);
+        const info = wp.noForecast ? { icon: '—', desc: 'No forecast available' } : weatherCodeToInfo(wp.weatherCode);
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const label = wp.isStart ? 'Departure' : wp.isEnd ? 'Arrival' : `${wp.distanceMiles} mi`;
@@ -563,23 +604,39 @@ function showWeatherCards(weatherData) {
 
         const card = document.createElement('div');
         card.className = `weather-card ${cardClass}`;
-        card.innerHTML = `
-            <div class="time-info">
-                <div class="location-name">${wp.locationName}</div>
-                <div class="arrival-time">${timeStr} · ${dateStr}</div>
-                <div class="arrival-time">${label}</div>
-            </div>
-            <div class="weather-icon">${info.icon}</div>
-            <div class="weather-details">
-                <div class="temp">${Math.round(wp.temperature)}°F</div>
-                <div class="description">${info.desc}</div>
-                <div class="extra">
-                    Wind: ${Math.round(wp.windSpeed)} mph ·
-                    Humidity: ${wp.humidity}%
-                    ${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% chance of precip` : ''}
+
+        if (wp.noForecast) {
+            card.innerHTML = `
+                <div class="time-info">
+                    <div class="location-name">${wp.locationName}</div>
+                    <div class="arrival-time">${timeStr} · ${dateStr}</div>
+                    <div class="arrival-time">${label}</div>
                 </div>
-            </div>
-        `;
+                <div class="weather-icon" style="opacity:0.4">—</div>
+                <div class="weather-details">
+                    <div class="temp" style="color:#a0aec0">N/A</div>
+                    <div class="description" style="color:#a0aec0">Forecast not available this far ahead</div>
+                </div>
+            `;
+        } else {
+            card.innerHTML = `
+                <div class="time-info">
+                    <div class="location-name">${wp.locationName}</div>
+                    <div class="arrival-time">${timeStr} · ${dateStr}</div>
+                    <div class="arrival-time">${label}</div>
+                </div>
+                <div class="weather-icon">${info.icon}</div>
+                <div class="weather-details">
+                    <div class="temp">${Math.round(wp.temperature)}°F</div>
+                    <div class="description">${info.desc}</div>
+                    <div class="extra">
+                        Wind: ${Math.round(wp.windSpeed)} mph ·
+                        Humidity: ${wp.humidity}%
+                        ${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% chance of precip` : ''}
+                    </div>
+                </div>
+            `;
+        }
         card.addEventListener('click', () => {
             map.panTo({ lat: wp.lat, lng: wp.lon });
             map.setZoom(10);

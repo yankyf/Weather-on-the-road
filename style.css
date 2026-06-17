@@ -234,6 +234,11 @@ header h1 {
     color: #a0aec0;
 }
 
+.weather-overlay.no-forecast {
+    opacity: 0.5;
+    border-color: #cbd5e0;
+}
+
 /* Error */
 .error {
     margin-top: 12px;
