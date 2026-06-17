@@ -347,7 +347,6 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
 
             const btn = document.createElement('button');
             btn.className = `route-option ${isBest ? 'selected' : ''}`;
-            btn.style.borderLeftColor = routeColors[Math.min(idx, routeColors.length - 1)];
 
             let weatherLabel = '';
             if (rd.badWeatherCount === 0 && rd.maxRain <= 20) {
@@ -359,12 +358,18 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
             }
 
             btn.innerHTML = `
-                <div class="route-option-top">
-                    <strong>via ${summary}</strong>
-                    ${isBest ? weatherLabel : weatherLabel}
+                <div class="route-number" style="background: ${routeColors[Math.min(idx, routeColors.length - 1)]}">${idx + 1}</div>
+                <div class="route-option-content">
+                    <div class="route-option-top">
+                        <strong>via ${summary}</strong>
+                        ${weatherLabel}
+                    </div>
+                    <div class="route-option-details">
+                        ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi · Max rain: ${rd.maxRain}%
+                    </div>
                 </div>
-                <div class="route-option-details">
-                    ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi · Max rain: ${rd.maxRain}%
+                <div class="route-check">
+                    <svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
             `;
 

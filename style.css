@@ -329,30 +329,56 @@ header h1 {
 }
 
 .route-option {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 12px;
     width: 100%;
     text-align: left;
-    padding: 12px 14px;
+    padding: 14px 16px;
     margin-bottom: 8px;
     background: #f7fafc;
     border: 2px solid #e2e8f0;
-    border-left: 5px solid #a0aec0;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     font-family: inherit;
     font-size: 0.9rem;
-    transition: all 0.15s;
+    transition: all 0.2s;
+    position: relative;
 }
 
 .route-option:hover {
     background: #ebf8ff;
-    border-color: #bee3f8;
+    border-color: #90cdf4;
+    box-shadow: 0 2px 8px rgba(49, 130, 206, 0.12);
 }
 
 .route-option.selected {
     background: #ebf8ff;
     border-color: #3182ce;
-    border-left-color: #3182ce;
+    box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.2), 0 2px 8px rgba(49, 130, 206, 0.15);
+}
+
+.route-number {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: white;
+    background: #a0aec0;
+}
+
+.route-option.selected .route-number {
+    transform: scale(1.1);
+}
+
+.route-option-content {
+    flex: 1;
+    min-width: 0;
 }
 
 .route-option-top {
@@ -366,6 +392,34 @@ header h1 {
     font-size: 0.8rem;
     color: #718096;
     margin-top: 4px;
+}
+
+.route-check {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #cbd5e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.route-option.selected .route-check {
+    background: #3182ce;
+    border-color: #3182ce;
+}
+
+.route-check svg {
+    width: 12px;
+    height: 12px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.route-option.selected .route-check svg {
+    opacity: 1;
 }
 
 .weather-badge {
