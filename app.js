@@ -9,13 +9,12 @@ const weatherTimeline = document.getElementById('weather-timeline');
 const timelineCards = document.getElementById('timeline-cards');
 
 let map = null;
-let directionsRenderer = null;
 let altRenderers = [];
 let weatherOverlays = [];
 let routeMarkers = [];
 let WeatherOverlay = null;
 let allRoutes = null;
-let selectedRouteIndex = 0;
+let trafficLayer = null;
 
 const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
@@ -39,10 +38,17 @@ function initApp() {
             this.div.innerHTML = this.content;
             this.div.style.position = 'absolute';
             this.div.style.zIndex = '1';
-            this.div.style.transition = 'z-index 0s';
-            this.div.addEventListener('mouseenter', () => { this.div.style.zIndex = '999'; });
-            this.div.addEventListener('mouseleave', () => { this.div.style.zIndex = '1'; });
-            this.getPanes().floatPane.appendChild(this.div);
+            this.div.addEventListener('mouseenter', () => {
+                this.div.style.zIndex = '9999';
+                this.div.querySelector('.weather-overlay').style.transform = 'scale(1.15)';
+                this.div.querySelector('.weather-overlay').style.boxShadow = '0 4px 16px rgba(0,0,0,0.4)';
+            });
+            this.div.addEventListener('mouseleave', () => {
+                this.div.style.zIndex = '1';
+                this.div.querySelector('.weather-overlay').style.transform = 'scale(1)';
+                this.div.querySelector('.weather-overlay').style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+            });
+            this.getPanes().overlayMouseTarget.appendChild(this.div);
         }
 
         draw() {
@@ -66,6 +72,7 @@ function initApp() {
         map = new google.maps.Map(document.getElementById('map'), {
             center: { lat: 39.8283, lng: -98.5795 },
             zoom: 5,
+            gestureHandling: 'greedy',
             mapTypeControl: true,
             streetViewControl: false,
             fullscreenControl: false,
@@ -74,11 +81,8 @@ function initApp() {
             }
         });
 
-        directionsRenderer = new google.maps.DirectionsRenderer({
-            map: map,
-            suppressMarkers: true,
-            polylineOptions: { strokeColor: '#3182ce', strokeWeight: 5, strokeOpacity: 0.8 }
-        });
+        trafficLayer = new google.maps.TrafficLayer();
+        trafficLayer.setMap(map);
 
         const originSearchBox = new google.maps.places.SearchBox(originInput);
         const destSearchBox = new google.maps.places.SearchBox(destinationInput);
@@ -117,11 +121,26 @@ function initApp() {
         });
 
         planButton.addEventListener('click', () => planTrip());
+        document.getElementById('reset-trip').addEventListener('click', () => resetTrip());
     } catch (err) {
         showError('Google Maps failed to initialize: ' + err.message);
     }
 }
 window.initApp = initApp;
+
+function resetTrip() {
+    clearOverlays();
+    originInput.value = '';
+    destinationInput.value = '';
+    departureDateInput.value = today.toISOString().split('T')[0];
+    departureTimeInput.value = '08:00';
+    weatherTimeline.classList.add('hidden');
+    timelineCards.innerHTML = '';
+    hideError();
+    allRoutes = null;
+    map.setCenter({ lat: 39.8283, lng: -98.5795 });
+    map.setZoom(5);
+}
 
 function clearOverlays() {
     weatherOverlays.forEach(o => o.setMap(null));
@@ -189,6 +208,10 @@ function getRoute(origin, destination) {
                 destination: destination,
                 travelMode: google.maps.TravelMode.DRIVING,
                 provideRouteAlternatives: true,
+                drivingOptions: {
+                    departureTime: new Date(),
+                    trafficModel: 'bestguess'
+                }
             },
             (result, status) => {
                 if (status === 'OK') {
@@ -204,7 +227,7 @@ function getRoute(origin, destination) {
 function sampleWaypoints(directionsResult, routeIndex, departureTime) {
     const route = directionsResult.routes[routeIndex];
     const leg = route.legs[0];
-    const totalDuration = leg.duration.value;
+    const totalDuration = (leg.duration_in_traffic || leg.duration).value;
     const totalDistance = leg.distance.value;
     const path = route.overview_path;
 
@@ -224,6 +247,7 @@ function sampleWaypoints(directionsResult, routeIndex, departureTime) {
             lon: point.lng(),
             arrivalTime,
             distanceMiles,
+            fraction,
             isStart: i === 0,
             isEnd: i === numStops - 1,
         });
@@ -281,6 +305,21 @@ async function getWeatherForWaypoints(waypoints) {
     return Promise.all(weatherPromises);
 }
 
+const weatherCategories = {
+    clear: { label: 'Clear', color: '#48bb78', icon: '☀️', codes: [0, 1] },
+    cloudy: { label: 'Cloudy', color: '#a0aec0', icon: '☁️', codes: [2, 3, 45, 48] },
+    rain: { label: 'Rain', color: '#4299e1', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
+    snow: { label: 'Snow', color: '#90cdf4', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
+    storm: { label: 'Storm', color: '#fc8181', icon: '⚡', codes: [95, 96, 99] },
+};
+
+function getWeatherCategory(code) {
+    for (const [key, val] of Object.entries(weatherCategories)) {
+        if (val.codes.includes(code)) return key;
+    }
+    return 'clear';
+}
+
 function weatherCodeToInfo(code) {
     const mapping = {
         0: { icon: '☀️', desc: 'Clear sky' },
@@ -313,36 +352,40 @@ function weatherCodeToInfo(code) {
     return mapping[code] || { icon: '❓', desc: 'Unknown' };
 }
 
-function getWeatherBreakdown(weatherData) {
-    const categories = {
-        clear: { label: 'Clear', color: '#f6e05e', icon: '☀️', codes: [0, 1] },
-        cloudy: { label: 'Cloudy', color: '#cbd5e0', icon: '☁️', codes: [2, 3, 45, 48] },
-        rain: { label: 'Rain', color: '#63b3ed', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
-        snow: { label: 'Snow', color: '#b2d8f7', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
-        storm: { label: 'Storm', color: '#fc8181', icon: '⚡', codes: [95, 96, 99] },
-    };
-
+function buildWeatherBar(weatherData) {
     const segments = [];
     for (let i = 0; i < weatherData.length - 1; i++) {
-        const timeDiff = weatherData[i + 1].arrivalTime - weatherData[i].arrivalTime;
-        let cat = 'clear';
-        for (const [key, val] of Object.entries(categories)) {
-            if (val.codes.includes(weatherData[i].weatherCode)) { cat = key; break; }
-        }
-        segments.push({ cat, duration: timeDiff });
+        const cat = getWeatherCategory(weatherData[i].weatherCode);
+        const startPct = weatherData[i].fraction * 100;
+        const endPct = weatherData[i + 1].fraction * 100;
+        const widthPct = endPct - startPct;
+        const info = weatherCategories[cat];
+        segments.push({
+            width: widthPct,
+            color: info.color,
+            icon: info.icon,
+            label: info.label,
+            location: weatherData[i].locationName,
+        });
     }
-    const totalTime = segments.reduce((s, seg) => s + seg.duration, 0) || 1;
 
-    const sums = {};
-    segments.forEach(seg => { sums[seg.cat] = (sums[seg.cat] || 0) + seg.duration; });
+    const barHtml = segments.map(s =>
+        `<div style="flex:${s.width};background:${s.color};height:100%;" title="${s.icon} ${s.label} at ${s.location}"></div>`
+    ).join('');
 
-    const parts = [];
-    for (const [key, val] of Object.entries(categories)) {
-        if (sums[key]) {
-            parts.push({ ...val, pct: Math.round(sums[key] / totalTime * 100) });
-        }
-    }
-    return parts;
+    const totals = {};
+    segments.forEach(s => {
+        if (!totals[s.label]) totals[s.label] = { width: 0, icon: s.icon, color: s.color };
+        totals[s.label].width += s.width;
+    });
+    const legendHtml = Object.entries(totals).map(([label, t]) =>
+        `<span style="display:inline-flex;align-items:center;gap:3px;font-size:0.75rem;color:#4a5568;">
+            <span style="width:8px;height:8px;border-radius:50%;background:${t.color};display:inline-block;"></span>
+            ${t.icon} ${label} ${Math.round(t.width)}%
+        </span>`
+    ).join(' ');
+
+    return { barHtml, legendHtml };
 }
 
 function displayRouteOptions(directionsResult, routeWeatherData, departureDateTime) {
@@ -352,6 +395,28 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
 
     const routeColors = ['#3182ce', '#d69e2e', '#9f7aea'];
 
+    function renderRouteLines(selectedIdx) {
+        altRenderers.forEach(r => r.setMap(null));
+        altRenderers = [];
+
+        routeWeatherData.forEach((rd, ri) => {
+            const isSelected = ri === selectedIdx;
+            const renderer = new google.maps.DirectionsRenderer({
+                map: map,
+                directions: directionsResult,
+                routeIndex: rd.routeIndex,
+                suppressMarkers: true,
+                polylineOptions: {
+                    strokeColor: isSelected ? routeColors[Math.min(selectedIdx, routeColors.length - 1)] : '#a0aec0',
+                    strokeWeight: isSelected ? 6 : 3,
+                    strokeOpacity: isSelected ? 0.9 : 0.35,
+                    zIndex: isSelected ? 10 : 1,
+                }
+            });
+            altRenderers.push(renderer);
+        });
+    }
+
     if (routeWeatherData.length > 1) {
         const routePicker = document.createElement('div');
         routePicker.className = 'route-picker';
@@ -360,26 +425,13 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
         routeWeatherData.forEach((rd, idx) => {
             const route = directionsResult.routes[rd.routeIndex];
             const leg = route.legs[0];
-            const durationMin = Math.round(leg.duration.value / 60);
+            const duration = leg.duration_in_traffic || leg.duration;
+            const durationMin = Math.round(duration.value / 60);
             const hours = Math.floor(durationMin / 60);
             const mins = durationMin % 60;
             const distMiles = (leg.distance.value / 1609.34).toFixed(0);
             const summary = route.summary || `Route ${idx + 1}`;
             const isBest = idx === 0;
-
-            const renderer = new google.maps.DirectionsRenderer({
-                map: map,
-                directions: directionsResult,
-                routeIndex: rd.routeIndex,
-                suppressMarkers: true,
-                polylineOptions: {
-                    strokeColor: isBest ? routeColors[0] : '#a0aec0',
-                    strokeWeight: isBest ? 5 : 3,
-                    strokeOpacity: isBest ? 0.8 : 0.4,
-                    zIndex: isBest ? 2 : 1,
-                }
-            });
-            altRenderers.push(renderer);
 
             const btn = document.createElement('button');
             btn.className = `route-option ${isBest ? 'selected' : ''}`;
@@ -390,16 +442,13 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
             } else if (rd.badWeatherCount > 0) {
                 weatherLabel = `<span class="weather-badge bad">${rd.badWeatherCount} bad stretch${rd.badWeatherCount > 1 ? 'es' : ''}</span>`;
             } else if (rd.maxRain > 50) {
-                weatherLabel = `<span class="weather-badge warn">Up to ${rd.maxRain}% rain</span>`;
+                weatherLabel = `<span class="weather-badge warn">Up to ${rd.maxRain}% rain chance</span>`;
             }
 
-            const breakdown = getWeatherBreakdown(rd.weatherData);
-            const barHtml = breakdown.map(b =>
-                `<div style="flex:${b.pct};background:${b.color};height:100%;border-radius:3px;" title="${b.icon} ${b.label} ${b.pct}%"></div>`
-            ).join('');
-            const legendHtml = breakdown.map(b =>
-                `<span style="font-size:0.75rem;color:#4a5568;">${b.icon} ${b.pct}%</span>`
-            ).join(' ');
+            const { barHtml, legendHtml } = buildWeatherBar(rd.weatherData);
+
+            const trafficNote = leg.duration_in_traffic ?
+                ` · ${Math.round(leg.duration_in_traffic.value / 60) - Math.round(leg.duration.value / 60)} min traffic` : '';
 
             btn.innerHTML = `
                 <div class="route-number" style="background: ${routeColors[Math.min(idx, routeColors.length - 1)]}">${idx + 1}</div>
@@ -409,10 +458,12 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
                         ${weatherLabel}
                     </div>
                     <div class="route-option-details">
-                        ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi
+                        ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi${trafficNote}
                     </div>
-                    <div style="display:flex;gap:2px;height:6px;margin-top:6px;border-radius:3px;overflow:hidden;">${barHtml}</div>
-                    <div style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;">${legendHtml}</div>
+                    <div class="weather-bar-container">
+                        <div class="weather-bar">${barHtml}</div>
+                    </div>
+                    <div class="weather-bar-legend">${legendHtml}</div>
                 </div>
                 <div class="route-check">
                     <svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -422,27 +473,7 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.route-option').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
-
-                altRenderers.forEach(r => r.setMap(null));
-                altRenderers = [];
-
-                routeWeatherData.forEach((rd2, ri) => {
-                    const isSelected = ri === idx;
-                    const renderer = new google.maps.DirectionsRenderer({
-                        map: map,
-                        directions: directionsResult,
-                        routeIndex: rd2.routeIndex,
-                        suppressMarkers: true,
-                        polylineOptions: {
-                            strokeColor: isSelected ? routeColors[0] : '#a0aec0',
-                            strokeWeight: isSelected ? 6 : 3,
-                            strokeOpacity: isSelected ? 0.9 : 0.4,
-                            zIndex: isSelected ? 10 : 1,
-                        }
-                    });
-                    altRenderers.push(renderer);
-                });
-
+                renderRouteLines(idx);
                 showWeatherCards(rd.weatherData);
                 showOverlaysOnMap(rd.weatherData);
             });
@@ -453,12 +484,9 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
         timelineCards.appendChild(routePicker);
     }
 
+    renderRouteLines(0);
     showWeatherCards(routeWeatherData[0].weatherData);
     showOverlaysOnMap(routeWeatherData[0].weatherData);
-
-    if (routeWeatherData.length <= 1) {
-        directionsRenderer.setDirections(directionsResult);
-    }
 
     const bounds = new google.maps.LatLngBounds();
     routeWeatherData[0].weatherData.forEach(wp => {
@@ -505,7 +533,8 @@ function showOverlaysOnMap(weatherData) {
                 <p style="margin:0; font-size:0.85rem; color:#666;">${timeStr} · ${dateStr}</p>
                 <p style="margin:6px 0; font-size:1.3rem;">${info.icon} ${Math.round(wp.temperature)}°F — ${info.desc}</p>
                 <p style="margin:0; font-size:0.8rem; color:#888;">
-                    💨 ${Math.round(wp.windSpeed)} mph · 🌧 ${wp.precipitationProb}% chance of rain · 💧 ${wp.humidity}% humidity
+                    Wind: ${Math.round(wp.windSpeed)} mph · Humidity: ${wp.humidity}%
+                    ${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% chance of precipitation` : ''}
                 </p>
             </div>
         `;
@@ -545,9 +574,9 @@ function showWeatherCards(weatherData) {
                 <div class="temp">${Math.round(wp.temperature)}°F</div>
                 <div class="description">${info.desc}</div>
                 <div class="extra">
-                    💨 ${Math.round(wp.windSpeed)} mph ·
-                    🌧 ${wp.precipitationProb}% chance ·
-                    💧 ${wp.humidity}% humidity
+                    Wind: ${Math.round(wp.windSpeed)} mph ·
+                    Humidity: ${wp.humidity}%
+                    ${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% chance of precip` : ''}
                 </div>
             </div>
         `;

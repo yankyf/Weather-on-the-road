@@ -141,8 +141,13 @@ header h1 {
     flex: 1;
 }
 
+.button-row {
+    display: flex;
+    gap: 8px;
+}
+
 #plan-trip {
-    width: 100%;
+    flex: 1;
     padding: 10px;
     background: #3182ce;
     color: white;
@@ -161,6 +166,22 @@ header h1 {
 #plan-trip:disabled {
     background: #a0aec0;
     cursor: not-allowed;
+}
+
+#reset-trip {
+    padding: 10px 14px;
+    background: #e2e8f0;
+    color: #4a5568;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#reset-trip:hover {
+    background: #cbd5e0;
 }
 
 /* Weather overlays on the map */
@@ -392,6 +413,27 @@ header h1 {
     font-size: 0.8rem;
     color: #718096;
     margin-top: 4px;
+}
+
+.weather-bar-container {
+    margin-top: 8px;
+    background: #edf2f7;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.weather-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.weather-bar-legend {
+    margin-top: 4px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .route-check {
