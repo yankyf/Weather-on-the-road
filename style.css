@@ -74,38 +74,57 @@ header h1 {
     flex: 1;
 }
 
-.suggestions {
-    list-style: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: white;
-    border: 1px solid #e2e8f0;
+.api-key-banner {
+    background: #fffbeb;
+    border: 1px solid #f6e05e;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.api-key-banner p {
+    color: #744210;
+    margin-bottom: 10px;
+}
+
+.api-key-banner .api-key-help {
+    font-size: 0.85rem;
+    color: #975a16;
+    margin-top: 10px;
+    margin-bottom: 0;
+}
+
+.api-key-banner a {
+    color: #2b6cb0;
+}
+
+.api-key-row {
+    display: flex;
+    gap: 10px;
+}
+
+.api-key-row input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
-    display: none;
-    max-height: 200px;
-    overflow-y: auto;
+    font-size: 0.95rem;
 }
 
-.suggestions.active {
-    display: block;
-}
-
-.suggestions li {
-    padding: 10px 14px;
+.api-key-row button {
+    padding: 8px 16px;
+    background: #d69e2e;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
     cursor: pointer;
-    border-bottom: 1px solid #f0f0f0;
+    white-space: nowrap;
 }
 
-.suggestions li:hover {
-    background: #ebf8ff;
-}
-
-.suggestions li:last-child {
-    border-bottom: none;
+.api-key-row button:hover {
+    background: #b7791f;
 }
 
 #plan-trip {

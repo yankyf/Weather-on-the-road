@@ -1,19 +1,17 @@
 const originInput = document.getElementById('origin');
 const destinationInput = document.getElementById('destination');
-const originSuggestions = document.getElementById('origin-suggestions');
-const destinationSuggestions = document.getElementById('destination-suggestions');
 const departureDateInput = document.getElementById('departure-date');
 const departureTimeInput = document.getElementById('departure-time');
 const planButton = document.getElementById('plan-trip');
 const errorMessage = document.getElementById('error-message');
 const resultsSection = document.getElementById('results');
 const timelineCards = document.getElementById('timeline-cards');
+const apiKeyBanner = document.getElementById('api-key-banner');
+const apiKeyInput = document.getElementById('api-key-input');
+const saveApiKeyBtn = document.getElementById('save-api-key');
 
 let map = null;
-let routeLayer = null;
-let markersLayer = null;
-let originCoords = null;
-let destinationCoords = null;
+let directionsRenderer = null;
 
 const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
@@ -22,68 +20,60 @@ const maxDate = new Date(today);
 maxDate.setDate(maxDate.getDate() + 14);
 departureDateInput.max = maxDate.toISOString().split('T')[0];
 
-let debounceTimer = null;
-
-function setupAutocomplete(input, suggestionsEl, setCoords) {
-    input.addEventListener('input', () => {
-        clearTimeout(debounceTimer);
-        const query = input.value.trim();
-        if (query.length < 3) {
-            suggestionsEl.classList.remove('active');
-            return;
-        }
-        debounceTimer = setTimeout(() => geocodeSearch(query, suggestionsEl, input, setCoords), 300);
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!input.contains(e.target) && !suggestionsEl.contains(e.target)) {
-            suggestionsEl.classList.remove('active');
-        }
-    });
+if (!localStorage.getItem('gmaps_api_key')) {
+    apiKeyBanner.classList.remove('hidden');
 }
 
-async function geocodeSearch(query, suggestionsEl, input, setCoords) {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`;
-    try {
-        const res = await fetch(url, {
-            headers: { 'Accept-Language': 'en' }
-        });
-        const data = await res.json();
-        suggestionsEl.innerHTML = '';
-        if (data.length === 0) {
-            suggestionsEl.classList.remove('active');
-            return;
-        }
-        data.forEach(place => {
-            const li = document.createElement('li');
-            li.textContent = place.display_name;
-            li.addEventListener('click', () => {
-                input.value = place.display_name;
-                setCoords({ lat: parseFloat(place.lat), lon: parseFloat(place.lon), name: place.display_name.split(',')[0] });
-                suggestionsEl.classList.remove('active');
-            });
-            suggestionsEl.appendChild(li);
-        });
-        suggestionsEl.classList.add('active');
-    } catch {
-        suggestionsEl.classList.remove('active');
-    }
+saveApiKeyBtn.addEventListener('click', () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) return;
+    localStorage.setItem('gmaps_api_key', key);
+    location.reload();
+});
+
+function initApp() {
+    apiKeyBanner.classList.add('hidden');
+
+    const originAutocomplete = new google.maps.places.Autocomplete(originInput, {
+        types: ['geocode', 'establishment']
+    });
+    const destAutocomplete = new google.maps.places.Autocomplete(destinationInput, {
+        types: ['geocode', 'establishment']
+    });
+
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 39.8283, lng: -98.5795 },
+        zoom: 4,
+        mapTypeControl: false,
+        streetViewControl: false,
+    });
+
+    directionsRenderer = new google.maps.DirectionsRenderer({
+        map: map,
+        suppressMarkers: true,
+        polylineOptions: { strokeColor: '#3182ce', strokeWeight: 4, strokeOpacity: 0.8 }
+    });
+
+    planButton.addEventListener('click', () => planTrip());
 }
+window.initApp = initApp;
 
-setupAutocomplete(originInput, originSuggestions, (coords) => { originCoords = coords; });
-setupAutocomplete(destinationInput, destinationSuggestions, (coords) => { destinationCoords = coords; });
+let routeMarkers = [];
 
-planButton.addEventListener('click', planTrip);
+function clearMarkers() {
+    routeMarkers.forEach(m => m.setMap(null));
+    routeMarkers = [];
+}
 
 async function planTrip() {
     hideError();
 
-    if (!originCoords) {
-        showError('Please select a starting point from the suggestions.');
+    if (!originInput.value.trim()) {
+        showError('Please enter a starting point.');
         return;
     }
-    if (!destinationCoords) {
-        showError('Please select a destination from the suggestions.');
+    if (!destinationInput.value.trim()) {
+        showError('Please enter a destination.');
         return;
     }
     if (!departureDateInput.value) {
@@ -97,7 +87,7 @@ async function planTrip() {
     timelineCards.innerHTML = '<div class="loading">Calculating route and fetching weather...</div>';
 
     try {
-        const route = await getRoute(originCoords, destinationCoords);
+        const route = await getRoute(originInput.value, destinationInput.value);
         const departureDateTime = new Date(`${departureDateInput.value}T${departureTimeInput.value}:00`);
         const waypoints = sampleWaypoints(route, departureDateTime);
         const weatherData = await getWeatherForWaypoints(waypoints);
@@ -111,35 +101,47 @@ async function planTrip() {
     }
 }
 
-async function getRoute(origin, dest) {
-    const url = `https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${dest.lon},${dest.lat}?overview=full&geometries=geojson&steps=true`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.code !== 'Ok' || !data.routes.length) {
-        throw new Error('Could not find a route between these locations.');
-    }
-    return data.routes[0];
+function getRoute(origin, destination) {
+    return new Promise((resolve, reject) => {
+        const directionsService = new google.maps.DirectionsService();
+        directionsService.route(
+            {
+                origin: origin,
+                destination: destination,
+                travelMode: google.maps.TravelMode.DRIVING,
+            },
+            (result, status) => {
+                if (status === 'OK') {
+                    resolve(result);
+                } else {
+                    reject(new Error('Could not find a route. ' + status));
+                }
+            }
+        );
+    });
 }
 
-function sampleWaypoints(route, departureTime) {
-    const coords = route.geometry.coordinates;
-    const totalDuration = route.duration;
-    const totalDistance = route.distance;
-    const numStops = Math.min(Math.max(Math.ceil(totalDuration / 3600), 3), 12);
+function sampleWaypoints(directionsResult, departureTime) {
+    const route = directionsResult.routes[0];
+    const leg = route.legs[0];
+    const totalDuration = leg.duration.value;
+    const totalDistance = leg.distance.value;
+    const path = route.overview_path;
 
+    const numStops = Math.min(Math.max(Math.ceil(totalDuration / 3600), 3), 12);
     const waypoints = [];
 
     for (let i = 0; i < numStops; i++) {
         const fraction = i / (numStops - 1);
-        const coordIndex = Math.min(Math.floor(fraction * (coords.length - 1)), coords.length - 1);
-        const [lon, lat] = coords[coordIndex];
+        const pathIndex = Math.min(Math.floor(fraction * (path.length - 1)), path.length - 1);
+        const point = path[pathIndex];
         const elapsedSeconds = fraction * totalDuration;
         const arrivalTime = new Date(departureTime.getTime() + elapsedSeconds * 1000);
         const distanceKm = (fraction * totalDistance / 1000).toFixed(0);
 
         waypoints.push({
-            lat,
-            lon,
+            lat: point.lat(),
+            lon: point.lng(),
             arrivalTime,
             distanceKm,
             isStart: i === 0,
@@ -147,33 +149,34 @@ function sampleWaypoints(route, departureTime) {
         });
     }
 
+    waypoints[0].locationName = leg.start_address.split(',')[0];
+    waypoints[numStops - 1].locationName = leg.end_address.split(',')[0];
+
     return waypoints;
 }
 
 async function reverseGeocode(lat, lon) {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
-    try {
-        const res = await fetch(url, {
-            headers: { 'Accept-Language': 'en' }
+    return new Promise((resolve) => {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: { lat, lng: lon } }, (results, status) => {
+            if (status === 'OK' && results[0]) {
+                const components = results[0].address_components;
+                const city = components.find(c => c.types.includes('locality'));
+                const county = components.find(c => c.types.includes('administrative_area_level_2'));
+                resolve(city ? city.long_name : county ? county.long_name : results[0].formatted_address.split(',')[0]);
+            } else {
+                resolve(`${lat.toFixed(2)}, ${lon.toFixed(2)}`);
+            }
         });
-        const data = await res.json();
-        if (data.address) {
-            return data.address.city || data.address.town || data.address.village || data.address.county || 'Unknown';
-        }
-    } catch { /* ignore */ }
-    return `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+    });
 }
 
 async function getWeatherForWaypoints(waypoints) {
-    const results = [];
-
-    const locationNames = await Promise.all(
-        waypoints.map(wp => {
-            if (wp.isStart && originCoords) return Promise.resolve(originCoords.name);
-            if (wp.isEnd && destinationCoords) return Promise.resolve(destinationCoords.name);
-            return reverseGeocode(wp.lat, wp.lon);
-        })
-    );
+    const locationPromises = waypoints.map(wp => {
+        if (wp.locationName) return Promise.resolve(wp.locationName);
+        return reverseGeocode(wp.lat, wp.lon);
+    });
+    const locationNames = await Promise.all(locationPromises);
 
     const weatherPromises = waypoints.map(async (wp, i) => {
         const dateStr = wp.arrivalTime.toISOString().split('T')[0];
@@ -182,7 +185,6 @@ async function getWeatherForWaypoints(waypoints) {
 
         const res = await fetch(url);
         const data = await res.json();
-
         const hourIndex = Math.min(hour, (data.hourly.time || []).length - 1);
 
         return {
@@ -231,38 +233,26 @@ function weatherCodeToInfo(code) {
     return mapping[code] || { icon: '❓', desc: 'Unknown' };
 }
 
-function displayResults(route, weatherData) {
-    if (!map) {
-        map = L.map('map');
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-    }
-
-    if (routeLayer) map.removeLayer(routeLayer);
-    if (markersLayer) map.removeLayer(markersLayer);
-
-    const routeCoords = route.geometry.coordinates.map(c => [c[1], c[0]]);
-    routeLayer = L.polyline(routeCoords, { color: '#3182ce', weight: 4, opacity: 0.8 }).addTo(map);
-    map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
-
-    markersLayer = L.layerGroup().addTo(map);
-
+function displayResults(directionsResult, weatherData) {
+    directionsRenderer.setDirections(directionsResult);
+    clearMarkers();
     timelineCards.innerHTML = '';
 
-    weatherData.forEach((wp) => {
+    weatherData.forEach((wp, i) => {
         const info = weatherCodeToInfo(wp.weatherCode);
 
-        const markerColor = wp.isStart ? 'green' : wp.isEnd ? 'red' : 'blue';
-        const markerIcon = L.divIcon({
-            className: 'custom-marker',
-            html: `<div style="background:${markerColor};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></div>`,
-            iconSize: [16, 16],
-            iconAnchor: [8, 8],
+        const marker = new google.maps.Marker({
+            position: { lat: wp.lat, lng: wp.lon },
+            map: map,
+            title: wp.locationName,
+            label: wp.isStart ? 'A' : wp.isEnd ? 'B' : `${i + 1}`,
         });
 
-        const marker = L.marker([wp.lat, wp.lon], { icon: markerIcon }).addTo(markersLayer);
-        marker.bindPopup(`<b>${wp.locationName}</b><br>${info.icon} ${info.desc}<br>${Math.round(wp.temperature)}°C`);
+        const infoWindow = new google.maps.InfoWindow({
+            content: `<b>${wp.locationName}</b><br>${info.icon} ${info.desc}<br>${Math.round(wp.temperature)}°C`
+        });
+        marker.addListener('click', () => infoWindow.open({ anchor: marker, map }));
+        routeMarkers.push(marker);
 
         const card = document.createElement('div');
         const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
@@ -275,7 +265,7 @@ function displayResults(route, weatherData) {
         card.innerHTML = `
             <div class="time-info">
                 <div class="location-name">${wp.locationName}</div>
-                <div class="arrival-time">${timeStr} • ${dateStr}</div>
+                <div class="arrival-time">${timeStr} · ${dateStr}</div>
                 <div class="arrival-time">${label}</div>
             </div>
             <div class="weather-icon">${info.icon}</div>
@@ -283,8 +273,8 @@ function displayResults(route, weatherData) {
                 <div class="temp">${Math.round(wp.temperature)}°C</div>
                 <div class="description">${info.desc}</div>
                 <div class="extra">
-                    Wind: ${Math.round(wp.windSpeed)} km/h •
-                    Rain: ${wp.precipitationProb}% •
+                    Wind: ${Math.round(wp.windSpeed)} km/h ·
+                    Rain: ${wp.precipitationProb}% ·
                     Humidity: ${wp.humidity}%
                 </div>
             </div>
@@ -301,4 +291,10 @@ function showError(msg) {
 
 function hideError() {
     errorMessage.classList.add('hidden');
+}
+
+if (!localStorage.getItem('gmaps_api_key')) {
+    planButton.addEventListener('click', () => {
+        showError('Please enter your Google Maps API key first.');
+    });
 }
