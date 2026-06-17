@@ -10,47 +10,47 @@
     <div id="app">
         <header>
             <h1>Weather on the Road</h1>
-            <p class="subtitle">See the weather along your entire trip</p>
         </header>
 
         <div id="api-key-banner" class="api-key-banner hidden">
-            <p>To use Google Maps, enter your API key below. It's saved in your browser only.</p>
+            <p>To use this app, enter your Google Maps API key below. It's saved in your browser only.</p>
             <div class="api-key-row">
                 <input type="text" id="api-key-input" placeholder="Paste your Google Maps API key" />
                 <button id="save-api-key">Save & Reload</button>
             </div>
             <p class="api-key-help">
                 Get a free key at <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a>
-                — enable "Maps JavaScript API", "Places API", and "Directions API".
+                &mdash; enable <strong>Maps JavaScript API</strong>, <strong>Places API</strong>, and <strong>Directions API</strong>.
             </p>
         </div>
 
-        <div class="controls">
-            <div class="input-group">
-                <label for="origin">Starting Point</label>
-                <input type="text" id="origin" placeholder="e.g. New York, NY" autocomplete="off" />
-            </div>
-            <div class="input-group">
-                <label for="destination">Destination</label>
-                <input type="text" id="destination" placeholder="e.g. Boston, MA" autocomplete="off" />
-            </div>
-            <div class="input-row">
-                <div class="input-group">
-                    <label for="departure-date">Departure Date</label>
-                    <input type="date" id="departure-date" />
+        <div id="main-content" class="hidden">
+            <div id="map-container">
+                <div id="map"></div>
+                <div id="search-panel">
+                    <div class="search-field">
+                        <label>From</label>
+                        <input type="text" id="origin" placeholder="Search starting point..." autocomplete="off" />
+                    </div>
+                    <div class="search-field">
+                        <label>To</label>
+                        <input type="text" id="destination" placeholder="Search destination..." autocomplete="off" />
+                    </div>
+                    <div class="search-row">
+                        <div class="search-field small">
+                            <label>Date</label>
+                            <input type="date" id="departure-date" />
+                        </div>
+                        <div class="search-field small">
+                            <label>Time</label>
+                            <input type="time" id="departure-time" value="08:00" />
+                        </div>
+                    </div>
+                    <button id="plan-trip">Go</button>
                 </div>
-                <div class="input-group">
-                    <label for="departure-time">Departure Time</label>
-                    <input type="time" id="departure-time" value="08:00" />
-                </div>
             </div>
-            <button id="plan-trip">Plan My Trip</button>
             <div id="error-message" class="error hidden"></div>
-        </div>
-
-        <div id="results" class="hidden">
-            <div id="map"></div>
-            <div id="weather-timeline">
+            <div id="weather-timeline" class="hidden">
                 <h2>Weather Along Your Route</h2>
                 <div id="timeline-cards"></div>
             </div>

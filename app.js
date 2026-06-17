@@ -4,7 +4,8 @@ const departureDateInput = document.getElementById('departure-date');
 const departureTimeInput = document.getElementById('departure-time');
 const planButton = document.getElementById('plan-trip');
 const errorMessage = document.getElementById('error-message');
-const resultsSection = document.getElementById('results');
+const mainContent = document.getElementById('main-content');
+const weatherTimeline = document.getElementById('weather-timeline');
 const timelineCards = document.getElementById('timeline-cards');
 const apiKeyBanner = document.getElementById('api-key-banner');
 const apiKeyInput = document.getElementById('api-key-input');
@@ -12,6 +13,8 @@ const saveApiKeyBtn = document.getElementById('save-api-key');
 
 let map = null;
 let directionsRenderer = null;
+let weatherOverlays = [];
+let routeMarkers = [];
 
 const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
@@ -31,29 +34,85 @@ saveApiKeyBtn.addEventListener('click', () => {
     location.reload();
 });
 
+class WeatherOverlay extends google.maps.OverlayView {
+    constructor(position, content, map) {
+        super();
+        this.position = position;
+        this.content = content;
+        this.div = null;
+        this.setMap(map);
+    }
+
+    onAdd() {
+        this.div = document.createElement('div');
+        this.div.innerHTML = this.content;
+        this.div.style.position = 'absolute';
+        this.getPanes().floatPane.appendChild(this.div);
+    }
+
+    draw() {
+        const projection = this.getProjection();
+        const pos = projection.fromLatLngToDivPixel(this.position);
+        if (pos) {
+            this.div.style.left = (pos.x - 40) + 'px';
+            this.div.style.top = (pos.y - 70) + 'px';
+        }
+    }
+
+    onRemove() {
+        if (this.div) {
+            this.div.parentNode.removeChild(this.div);
+            this.div = null;
+        }
+    }
+}
+
 function initApp() {
     apiKeyBanner.classList.add('hidden');
+    mainContent.classList.remove('hidden');
 
     try {
-        const originAutocomplete = new google.maps.places.Autocomplete(originInput, {
-            types: ['geocode', 'establishment']
-        });
-        const destAutocomplete = new google.maps.places.Autocomplete(destinationInput, {
-            types: ['geocode', 'establishment']
-        });
-
-        resultsSection.classList.remove('hidden');
         map = new google.maps.Map(document.getElementById('map'), {
             center: { lat: 39.8283, lng: -98.5795 },
-            zoom: 4,
-            mapTypeControl: false,
+            zoom: 5,
+            mapTypeControl: true,
             streetViewControl: false,
+            fullscreenControl: false,
+            zoomControlOptions: {
+                position: google.maps.ControlPosition.RIGHT_CENTER
+            }
         });
 
         directionsRenderer = new google.maps.DirectionsRenderer({
             map: map,
             suppressMarkers: true,
-            polylineOptions: { strokeColor: '#3182ce', strokeWeight: 4, strokeOpacity: 0.8 }
+            polylineOptions: { strokeColor: '#3182ce', strokeWeight: 5, strokeOpacity: 0.7 }
+        });
+
+        const originAutocomplete = new google.maps.places.Autocomplete(originInput, {
+            fields: ['formatted_address', 'geometry', 'name']
+        });
+        const destAutocomplete = new google.maps.places.Autocomplete(destinationInput, {
+            fields: ['formatted_address', 'geometry', 'name']
+        });
+
+        originAutocomplete.bindTo('bounds', map);
+        destAutocomplete.bindTo('bounds', map);
+
+        originAutocomplete.addListener('place_changed', () => {
+            const place = originAutocomplete.getPlace();
+            if (place.geometry) {
+                map.panTo(place.geometry.location);
+                map.setZoom(12);
+            }
+        });
+
+        destAutocomplete.addListener('place_changed', () => {
+            const place = destAutocomplete.getPlace();
+            if (place.geometry) {
+                map.panTo(place.geometry.location);
+                map.setZoom(12);
+            }
         });
 
         planButton.addEventListener('click', () => planTrip());
@@ -63,9 +122,9 @@ function initApp() {
 }
 window.initApp = initApp;
 
-let routeMarkers = [];
-
-function clearMarkers() {
+function clearOverlays() {
+    weatherOverlays.forEach(o => o.setMap(null));
+    weatherOverlays = [];
     routeMarkers.forEach(m => m.setMap(null));
     routeMarkers = [];
 }
@@ -87,8 +146,8 @@ async function planTrip() {
     }
 
     planButton.disabled = true;
-    planButton.textContent = 'Planning...';
-    resultsSection.classList.remove('hidden');
+    planButton.textContent = 'Loading...';
+    weatherTimeline.classList.remove('hidden');
     timelineCards.innerHTML = '<div class="loading">Calculating route and fetching weather...</div>';
 
     try {
@@ -99,10 +158,10 @@ async function planTrip() {
         displayResults(route, weatherData);
     } catch (err) {
         showError('Something went wrong: ' + err.message);
-        resultsSection.classList.add('hidden');
+        weatherTimeline.classList.add('hidden');
     } finally {
         planButton.disabled = false;
-        planButton.textContent = 'Plan My Trip';
+        planButton.textContent = 'Go';
     }
 }
 
@@ -240,33 +299,59 @@ function weatherCodeToInfo(code) {
 
 function displayResults(directionsResult, weatherData) {
     directionsRenderer.setDirections(directionsResult);
-    clearMarkers();
+    clearOverlays();
     timelineCards.innerHTML = '';
+    weatherTimeline.classList.remove('hidden');
+
+    const bounds = new google.maps.LatLngBounds();
 
     weatherData.forEach((wp, i) => {
         const info = weatherCodeToInfo(wp.weatherCode);
-
-        const marker = new google.maps.Marker({
-            position: { lat: wp.lat, lng: wp.lon },
-            map: map,
-            title: wp.locationName,
-            label: wp.isStart ? 'A' : wp.isEnd ? 'B' : `${i + 1}`,
-        });
-
-        const infoWindow = new google.maps.InfoWindow({
-            content: `<b>${wp.locationName}</b><br>${info.icon} ${info.desc}<br>${Math.round(wp.temperature)}°C`
-        });
-        marker.addListener('click', () => infoWindow.open({ anchor: marker, map }));
-        routeMarkers.push(marker);
-
-        const card = document.createElement('div');
-        const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
-        card.className = `weather-card ${cardClass}`;
-
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const label = wp.isStart ? 'Departure' : wp.isEnd ? 'Arrival' : `${wp.distanceKm} km`;
+        const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
 
+        // Weather overlay on the map
+        const overlayHtml = `
+            <div class="weather-overlay ${cardClass}">
+                <div class="overlay-icon">${info.icon}</div>
+                <div class="overlay-temp">${Math.round(wp.temperature)}°C</div>
+                <div class="overlay-label">${wp.locationName}</div>
+                <div class="overlay-time">${timeStr}</div>
+            </div>
+        `;
+
+        const position = new google.maps.LatLng(wp.lat, wp.lon);
+        const overlay = new WeatherOverlay(position, overlayHtml, map);
+        weatherOverlays.push(overlay);
+        bounds.extend(position);
+
+        // Info window for clicking
+        const marker = new google.maps.Marker({
+            position: { lat: wp.lat, lng: wp.lon },
+            map: map,
+            opacity: 0,
+            zIndex: 0,
+        });
+
+        const infoContent = `
+            <div style="font-family: sans-serif; min-width: 180px;">
+                <h3 style="margin:0 0 6px 0; font-size:1rem;">${wp.locationName}</h3>
+                <p style="margin:0; font-size:0.85rem; color:#666;">${timeStr} · ${dateStr}</p>
+                <p style="margin:6px 0; font-size:1.3rem;">${info.icon} ${Math.round(wp.temperature)}°C — ${info.desc}</p>
+                <p style="margin:0; font-size:0.8rem; color:#888;">
+                    Wind: ${Math.round(wp.windSpeed)} km/h · Rain: ${wp.precipitationProb}% · Humidity: ${wp.humidity}%
+                </p>
+            </div>
+        `;
+        const infoWindow = new google.maps.InfoWindow({ content: infoContent });
+        marker.addListener('click', () => infoWindow.open({ anchor: marker, map }));
+        routeMarkers.push(marker);
+
+        // Timeline card below the map
+        const card = document.createElement('div');
+        card.className = `weather-card ${cardClass}`;
         card.innerHTML = `
             <div class="time-info">
                 <div class="location-name">${wp.locationName}</div>
@@ -284,9 +369,16 @@ function displayResults(directionsResult, weatherData) {
                 </div>
             </div>
         `;
-
+        card.addEventListener('click', () => {
+            map.panTo({ lat: wp.lat, lng: wp.lon });
+            map.setZoom(10);
+            infoWindow.open({ anchor: marker, map });
+        });
+        card.style.cursor = 'pointer';
         timelineCards.appendChild(card);
     });
+
+    map.fitBounds(bounds, { top: 80, left: 340, right: 40, bottom: 40 });
 }
 
 function showError(msg) {
