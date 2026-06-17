@@ -7,14 +7,12 @@ const errorMessage = document.getElementById('error-message');
 const mainContent = document.getElementById('main-content');
 const weatherTimeline = document.getElementById('weather-timeline');
 const timelineCards = document.getElementById('timeline-cards');
-const apiKeyBanner = document.getElementById('api-key-banner');
-const apiKeyInput = document.getElementById('api-key-input');
-const saveApiKeyBtn = document.getElementById('save-api-key');
 
 let map = null;
 let directionsRenderer = null;
 let weatherOverlays = [];
 let routeMarkers = [];
+let WeatherOverlay = null;
 
 const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
@@ -23,53 +21,39 @@ const maxDate = new Date(today);
 maxDate.setDate(maxDate.getDate() + 14);
 departureDateInput.max = maxDate.toISOString().split('T')[0];
 
-if (!localStorage.getItem('gmaps_api_key')) {
-    apiKeyBanner.classList.remove('hidden');
-}
-
-saveApiKeyBtn.addEventListener('click', () => {
-    const key = apiKeyInput.value.trim();
-    if (!key) return;
-    localStorage.setItem('gmaps_api_key', key);
-    location.reload();
-});
-
-class WeatherOverlay extends google.maps.OverlayView {
-    constructor(position, content, map) {
-        super();
-        this.position = position;
-        this.content = content;
-        this.div = null;
-        this.setMap(map);
-    }
-
-    onAdd() {
-        this.div = document.createElement('div');
-        this.div.innerHTML = this.content;
-        this.div.style.position = 'absolute';
-        this.getPanes().floatPane.appendChild(this.div);
-    }
-
-    draw() {
-        const projection = this.getProjection();
-        const pos = projection.fromLatLngToDivPixel(this.position);
-        if (pos) {
-            this.div.style.left = (pos.x - 40) + 'px';
-            this.div.style.top = (pos.y - 70) + 'px';
-        }
-    }
-
-    onRemove() {
-        if (this.div) {
-            this.div.parentNode.removeChild(this.div);
-            this.div = null;
-        }
-    }
-}
-
 function initApp() {
-    apiKeyBanner.classList.add('hidden');
-    mainContent.classList.remove('hidden');
+    WeatherOverlay = class extends google.maps.OverlayView {
+        constructor(position, content, mapInstance) {
+            super();
+            this.position = position;
+            this.content = content;
+            this.div = null;
+            this.setMap(mapInstance);
+        }
+
+        onAdd() {
+            this.div = document.createElement('div');
+            this.div.innerHTML = this.content;
+            this.div.style.position = 'absolute';
+            this.getPanes().floatPane.appendChild(this.div);
+        }
+
+        draw() {
+            const projection = this.getProjection();
+            const pos = projection.fromLatLngToDivPixel(this.position);
+            if (pos) {
+                this.div.style.left = (pos.x - 40) + 'px';
+                this.div.style.top = (pos.y - 70) + 'px';
+            }
+        }
+
+        onRemove() {
+            if (this.div) {
+                this.div.parentNode.removeChild(this.div);
+                this.div = null;
+            }
+        }
+    };
 
     try {
         map = new google.maps.Map(document.getElementById('map'), {
@@ -117,7 +101,7 @@ function initApp() {
 
         planButton.addEventListener('click', () => planTrip());
     } catch (err) {
-        showError('Google Maps failed to initialize: ' + err.message + '. Make sure "Maps JavaScript API", "Places API", and "Directions API" are all enabled in your Google Cloud Console.');
+        showError('Google Maps failed to initialize: ' + err.message);
     }
 }
 window.initApp = initApp;
@@ -173,6 +157,8 @@ function getRoute(origin, destination) {
                 origin: origin,
                 destination: destination,
                 travelMode: google.maps.TravelMode.DRIVING,
+                provideRouteAlternatives: false,
+                optimizeWaypoints: true,
             },
             (result, status) => {
                 if (status === 'OK') {
@@ -201,13 +187,13 @@ function sampleWaypoints(directionsResult, departureTime) {
         const point = path[pathIndex];
         const elapsedSeconds = fraction * totalDuration;
         const arrivalTime = new Date(departureTime.getTime() + elapsedSeconds * 1000);
-        const distanceKm = (fraction * totalDistance / 1000).toFixed(0);
+        const distanceMiles = (fraction * totalDistance / 1609.34).toFixed(0);
 
         waypoints.push({
             lat: point.lat(),
             lon: point.lng(),
             arrivalTime,
-            distanceKm,
+            distanceMiles,
             isStart: i === 0,
             isEnd: i === numStops - 1,
         });
@@ -245,7 +231,7 @@ async function getWeatherForWaypoints(waypoints) {
     const weatherPromises = waypoints.map(async (wp, i) => {
         const dateStr = wp.arrivalTime.toISOString().split('T')[0];
         const hour = wp.arrivalTime.getHours();
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${wp.lat}&longitude=${wp.lon}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weathercode,windspeed_10m&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${wp.lat}&longitude=${wp.lon}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`;
 
         const res = await fetch(url);
         const data = await res.json();
@@ -309,14 +295,13 @@ function displayResults(directionsResult, weatherData) {
         const info = weatherCodeToInfo(wp.weatherCode);
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-        const label = wp.isStart ? 'Departure' : wp.isEnd ? 'Arrival' : `${wp.distanceKm} km`;
+        const label = wp.isStart ? 'Departure' : wp.isEnd ? 'Arrival' : `${wp.distanceMiles} mi`;
         const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
 
-        // Weather overlay on the map
         const overlayHtml = `
             <div class="weather-overlay ${cardClass}">
                 <div class="overlay-icon">${info.icon}</div>
-                <div class="overlay-temp">${Math.round(wp.temperature)}°C</div>
+                <div class="overlay-temp">${Math.round(wp.temperature)}°F</div>
                 <div class="overlay-label">${wp.locationName}</div>
                 <div class="overlay-time">${timeStr}</div>
             </div>
@@ -327,7 +312,6 @@ function displayResults(directionsResult, weatherData) {
         weatherOverlays.push(overlay);
         bounds.extend(position);
 
-        // Info window for clicking
         const marker = new google.maps.Marker({
             position: { lat: wp.lat, lng: wp.lon },
             map: map,
@@ -339,9 +323,9 @@ function displayResults(directionsResult, weatherData) {
             <div style="font-family: sans-serif; min-width: 180px;">
                 <h3 style="margin:0 0 6px 0; font-size:1rem;">${wp.locationName}</h3>
                 <p style="margin:0; font-size:0.85rem; color:#666;">${timeStr} · ${dateStr}</p>
-                <p style="margin:6px 0; font-size:1.3rem;">${info.icon} ${Math.round(wp.temperature)}°C — ${info.desc}</p>
+                <p style="margin:6px 0; font-size:1.3rem;">${info.icon} ${Math.round(wp.temperature)}°F — ${info.desc}</p>
                 <p style="margin:0; font-size:0.8rem; color:#888;">
-                    Wind: ${Math.round(wp.windSpeed)} km/h · Rain: ${wp.precipitationProb}% · Humidity: ${wp.humidity}%
+                    Wind: ${Math.round(wp.windSpeed)} mph · Rain: ${wp.precipitationProb}% · Humidity: ${wp.humidity}%
                 </p>
             </div>
         `;
@@ -349,7 +333,6 @@ function displayResults(directionsResult, weatherData) {
         marker.addListener('click', () => infoWindow.open({ anchor: marker, map }));
         routeMarkers.push(marker);
 
-        // Timeline card below the map
         const card = document.createElement('div');
         card.className = `weather-card ${cardClass}`;
         card.innerHTML = `
@@ -360,10 +343,10 @@ function displayResults(directionsResult, weatherData) {
             </div>
             <div class="weather-icon">${info.icon}</div>
             <div class="weather-details">
-                <div class="temp">${Math.round(wp.temperature)}°C</div>
+                <div class="temp">${Math.round(wp.temperature)}°F</div>
                 <div class="description">${info.desc}</div>
                 <div class="extra">
-                    Wind: ${Math.round(wp.windSpeed)} km/h ·
+                    Wind: ${Math.round(wp.windSpeed)} mph ·
                     Rain: ${wp.precipitationProb}% ·
                     Humidity: ${wp.humidity}%
                 </div>
@@ -388,10 +371,4 @@ function showError(msg) {
 
 function hideError() {
     errorMessage.classList.add('hidden');
-}
-
-if (!localStorage.getItem('gmaps_api_key')) {
-    planButton.addEventListener('click', () => {
-        showError('Please enter your Google Maps API key first.');
-    });
 }

@@ -12,19 +12,7 @@
             <h1>Weather on the Road</h1>
         </header>
 
-        <div id="api-key-banner" class="api-key-banner hidden">
-            <p>To use this app, enter your Google Maps API key below. It's saved in your browser only.</p>
-            <div class="api-key-row">
-                <input type="text" id="api-key-input" placeholder="Paste your Google Maps API key" />
-                <button id="save-api-key">Save & Reload</button>
-            </div>
-            <p class="api-key-help">
-                Get a free key at <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a>
-                &mdash; enable <strong>Maps JavaScript API</strong>, <strong>Places API</strong>, and <strong>Directions API</strong>.
-            </p>
-        </div>
-
-        <div id="main-content" class="hidden">
+        <div id="main-content">
             <div id="map-container">
                 <div id="map"></div>
                 <div id="search-panel">
@@ -58,18 +46,8 @@
     </div>
 
     <script src="app.js"></script>
-    <script>
-        const GOOGLE_MAPS_API_KEY = localStorage.getItem('gmaps_api_key') || '';
-        if (GOOGLE_MAPS_API_KEY) {
-            const s = document.createElement('script');
-            s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initApp`;
-            s.async = true;
-            s.onerror = function() {
-                document.getElementById('error-message').textContent = 'Failed to load Google Maps. Check your API key and make sure Maps JavaScript API and Places API are enabled.';
-                document.getElementById('error-message').classList.remove('hidden');
-            };
-            document.head.appendChild(s);
-        }
+    <script async
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA8ml0f--AxASCrSTT9jqgNIU_1JF2yqM4&libraries=places&callback=initApp">
     </script>
 </body>
 </html>
