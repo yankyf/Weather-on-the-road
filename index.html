@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather on the Road</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Weather on the Road</h1>
+            <p class="subtitle">See the weather along your entire trip</p>
+        </header>
+
+        <div class="controls">
+            <div class="input-group">
+                <label for="origin">Starting Point</label>
+                <input type="text" id="origin" placeholder="e.g. New York, NY" autocomplete="off" />
+                <ul class="suggestions" id="origin-suggestions"></ul>
+            </div>
+            <div class="input-group">
+                <label for="destination">Destination</label>
+                <input type="text" id="destination" placeholder="e.g. Boston, MA" autocomplete="off" />
+                <ul class="suggestions" id="destination-suggestions"></ul>
+            </div>
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="departure-date">Departure Date</label>
+                    <input type="date" id="departure-date" />
+                </div>
+                <div class="input-group">
+                    <label for="departure-time">Departure Time</label>
+                    <input type="time" id="departure-time" value="08:00" />
+                </div>
+            </div>
+            <button id="plan-trip">Plan My Trip</button>
+            <div id="error-message" class="error hidden"></div>
+        </div>
+
+        <div id="results" class="hidden">
+            <div id="map"></div>
+            <div id="weather-timeline">
+                <h2>Weather Along Your Route</h2>
+                <div id="timeline-cards"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
