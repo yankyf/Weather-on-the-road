@@ -34,27 +34,32 @@ saveApiKeyBtn.addEventListener('click', () => {
 function initApp() {
     apiKeyBanner.classList.add('hidden');
 
-    const originAutocomplete = new google.maps.places.Autocomplete(originInput, {
-        types: ['geocode', 'establishment']
-    });
-    const destAutocomplete = new google.maps.places.Autocomplete(destinationInput, {
-        types: ['geocode', 'establishment']
-    });
+    try {
+        const originAutocomplete = new google.maps.places.Autocomplete(originInput, {
+            types: ['geocode', 'establishment']
+        });
+        const destAutocomplete = new google.maps.places.Autocomplete(destinationInput, {
+            types: ['geocode', 'establishment']
+        });
 
-    map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: 39.8283, lng: -98.5795 },
-        zoom: 4,
-        mapTypeControl: false,
-        streetViewControl: false,
-    });
+        resultsSection.classList.remove('hidden');
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: { lat: 39.8283, lng: -98.5795 },
+            zoom: 4,
+            mapTypeControl: false,
+            streetViewControl: false,
+        });
 
-    directionsRenderer = new google.maps.DirectionsRenderer({
-        map: map,
-        suppressMarkers: true,
-        polylineOptions: { strokeColor: '#3182ce', strokeWeight: 4, strokeOpacity: 0.8 }
-    });
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map: map,
+            suppressMarkers: true,
+            polylineOptions: { strokeColor: '#3182ce', strokeWeight: 4, strokeOpacity: 0.8 }
+        });
 
-    planButton.addEventListener('click', () => planTrip());
+        planButton.addEventListener('click', () => planTrip());
+    } catch (err) {
+        showError('Google Maps failed to initialize: ' + err.message + '. Make sure "Maps JavaScript API", "Places API", and "Directions API" are all enabled in your Google Cloud Console.');
+    }
 }
 window.initApp = initApp;
 

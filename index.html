@@ -28,11 +28,11 @@
         <div class="controls">
             <div class="input-group">
                 <label for="origin">Starting Point</label>
-                <input type="text" id="origin" placeholder="e.g. New York, NY" />
+                <input type="text" id="origin" placeholder="e.g. New York, NY" autocomplete="off" />
             </div>
             <div class="input-group">
                 <label for="destination">Destination</label>
-                <input type="text" id="destination" placeholder="e.g. Boston, MA" />
+                <input type="text" id="destination" placeholder="e.g. Boston, MA" autocomplete="off" />
             </div>
             <div class="input-row">
                 <div class="input-group">
@@ -57,15 +57,19 @@
         </div>
     </div>
 
+    <script src="app.js"></script>
     <script>
         const GOOGLE_MAPS_API_KEY = localStorage.getItem('gmaps_api_key') || '';
         if (GOOGLE_MAPS_API_KEY) {
             const s = document.createElement('script');
             s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initApp`;
             s.async = true;
+            s.onerror = function() {
+                document.getElementById('error-message').textContent = 'Failed to load Google Maps. Check your API key and make sure Maps JavaScript API and Places API are enabled.';
+                document.getElementById('error-message').classList.remove('hidden');
+            };
             document.head.appendChild(s);
         }
     </script>
-    <script src="app.js"></script>
 </body>
 </html>
