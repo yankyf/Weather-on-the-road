@@ -309,6 +309,23 @@ function weatherCodeToInfo(code) {
     return mapping[code] || { icon: '❓', desc: 'Unknown' };
 }
 
+function getWeatherBreakdown(weatherData) {
+    const total = weatherData.length;
+    const sunny = weatherData.filter(w => [0, 1].includes(w.weatherCode)).length;
+    const cloudy = weatherData.filter(w => [2, 3, 45, 48].includes(w.weatherCode)).length;
+    const rainy = weatherData.filter(w => [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(w.weatherCode)).length;
+    const snow = weatherData.filter(w => [66, 67, 71, 73, 75, 77, 85, 86].includes(w.weatherCode)).length;
+    const storm = weatherData.filter(w => [95, 96, 99].includes(w.weatherCode)).length;
+
+    const parts = [];
+    if (sunny > 0) parts.push({ label: 'Clear', pct: Math.round(sunny / total * 100), color: '#f6e05e', icon: '☀️' });
+    if (cloudy > 0) parts.push({ label: 'Cloudy', pct: Math.round(cloudy / total * 100), color: '#cbd5e0', icon: '☁️' });
+    if (rainy > 0) parts.push({ label: 'Rain', pct: Math.round(rainy / total * 100), color: '#63b3ed', icon: '🌧️' });
+    if (snow > 0) parts.push({ label: 'Snow', pct: Math.round(snow / total * 100), color: '#e2e8f0', icon: '🌨️' });
+    if (storm > 0) parts.push({ label: 'Storm', pct: Math.round(storm / total * 100), color: '#fc8181', icon: '⚡' });
+    return parts;
+}
+
 function displayRouteOptions(directionsResult, routeWeatherData, departureDateTime) {
     clearOverlays();
     timelineCards.innerHTML = '';
@@ -357,6 +374,14 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
                 weatherLabel = `<span class="weather-badge warn">Up to ${rd.maxRain}% rain</span>`;
             }
 
+            const breakdown = getWeatherBreakdown(rd.weatherData);
+            const barHtml = breakdown.map(b =>
+                `<div style="flex:${b.pct};background:${b.color};height:100%;border-radius:3px;" title="${b.icon} ${b.label} ${b.pct}%"></div>`
+            ).join('');
+            const legendHtml = breakdown.map(b =>
+                `<span style="font-size:0.75rem;color:#4a5568;">${b.icon} ${b.pct}%</span>`
+            ).join(' ');
+
             btn.innerHTML = `
                 <div class="route-number" style="background: ${routeColors[Math.min(idx, routeColors.length - 1)]}">${idx + 1}</div>
                 <div class="route-option-content">
@@ -365,8 +390,10 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
                         ${weatherLabel}
                     </div>
                     <div class="route-option-details">
-                        ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi · Max rain: ${rd.maxRain}%
+                        ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi
                     </div>
+                    <div style="display:flex;gap:2px;height:6px;margin-top:6px;border-radius:3px;overflow:hidden;">${barHtml}</div>
+                    <div style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;">${legendHtml}</div>
                 </div>
                 <div class="route-check">
                     <svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -377,15 +404,24 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
                 document.querySelectorAll('.route-option').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
 
-                altRenderers.forEach((r, ri) => {
-                    r.setOptions({
+                altRenderers.forEach(r => r.setMap(null));
+                altRenderers = [];
+
+                routeWeatherData.forEach((rd2, ri) => {
+                    const isSelected = ri === idx;
+                    const renderer = new google.maps.DirectionsRenderer({
+                        map: map,
+                        directions: directionsResult,
+                        routeIndex: rd2.routeIndex,
+                        suppressMarkers: true,
                         polylineOptions: {
-                            strokeColor: ri === idx ? routeColors[0] : '#a0aec0',
-                            strokeWeight: ri === idx ? 5 : 3,
-                            strokeOpacity: ri === idx ? 0.8 : 0.4,
-                            zIndex: ri === idx ? 2 : 1,
+                            strokeColor: isSelected ? routeColors[0] : '#a0aec0',
+                            strokeWeight: isSelected ? 6 : 3,
+                            strokeOpacity: isSelected ? 0.9 : 0.4,
+                            zIndex: isSelected ? 10 : 1,
                         }
                     });
+                    altRenderers.push(renderer);
                 });
 
                 showWeatherCards(rd.weatherData);
