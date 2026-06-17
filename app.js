@@ -14,15 +14,12 @@ let weatherOverlays = [];
 let routeMarkers = [];
 let WeatherOverlay = null;
 let allRoutes = null;
-let trafficLayer = null;
 let lastRouteBounds = null;
 
 const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
 departureDateInput.min = today.toISOString().split('T')[0];
-const maxDate = new Date(today);
-maxDate.setDate(maxDate.getDate() + 16);
-departureDateInput.max = maxDate.toISOString().split('T')[0];
+// No max date — weather shows "N/A" for dates beyond forecast range
 
 function initApp() {
     WeatherOverlay = class extends google.maps.OverlayView {
@@ -81,9 +78,6 @@ function initApp() {
                 position: google.maps.ControlPosition.RIGHT_CENTER
             }
         });
-
-        trafficLayer = new google.maps.TrafficLayer();
-        trafficLayer.setMap(map);
 
         const recenterBtn = document.createElement('button');
         recenterBtn.id = 'recenter-map';
@@ -439,19 +433,30 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
 
     const routeColors = ['#3182ce', '#d69e2e', '#9f7aea'];
 
+    function getTrafficColor(route) {
+        const leg = route.legs[0];
+        if (!leg.duration_in_traffic) return '#3182ce';
+        const ratio = leg.duration_in_traffic.value / leg.duration.value;
+        if (ratio <= 1.05) return '#48bb78';
+        if (ratio <= 1.2) return '#ecc94b';
+        return '#e53e3e';
+    }
+
     function renderRouteLines(selectedIdx) {
         altRenderers.forEach(r => r.setMap(null));
         altRenderers = [];
 
         routeWeatherData.forEach((rd, ri) => {
             const isSelected = ri === selectedIdx;
+            const route = directionsResult.routes[rd.routeIndex];
+            const selectedColor = getTrafficColor(route);
             const renderer = new google.maps.DirectionsRenderer({
                 map: map,
                 directions: directionsResult,
                 routeIndex: rd.routeIndex,
                 suppressMarkers: true,
                 polylineOptions: {
-                    strokeColor: isSelected ? routeColors[Math.min(selectedIdx, routeColors.length - 1)] : '#a0aec0',
+                    strokeColor: isSelected ? selectedColor : '#a0aec0',
                     strokeWeight: isSelected ? 6 : 3,
                     strokeOpacity: isSelected ? 0.9 : 0.35,
                     zIndex: isSelected ? 10 : 1,
@@ -492,9 +497,8 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
             const { barHtml, legendHtml } = buildWeatherBar(rd.weatherData);
 
             let trafficBarHtml = '';
-            let trafficDelayMin = 0;
             if (leg.duration_in_traffic) {
-                trafficDelayMin = Math.round((leg.duration_in_traffic.value - leg.duration.value) / 60);
+                const trafficDelayMin = Math.round((leg.duration_in_traffic.value - leg.duration.value) / 60);
                 const delayRatio = leg.duration_in_traffic.value / leg.duration.value;
                 let trafficColor, trafficLabel;
                 if (delayRatio <= 1.05) {
@@ -502,10 +506,10 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
                     trafficLabel = 'Light traffic';
                 } else if (delayRatio <= 1.2) {
                     trafficColor = '#ecc94b';
-                    trafficLabel = `Moderate traffic (+${trafficDelayMin} min)`;
+                    trafficLabel = `Moderate (+${trafficDelayMin} min)`;
                 } else {
                     trafficColor = '#e53e3e';
-                    trafficLabel = `Heavy traffic (+${trafficDelayMin} min)`;
+                    trafficLabel = `Heavy (+${trafficDelayMin} min)`;
                 }
                 trafficBarHtml = `
                     <div class="traffic-row">
@@ -514,6 +518,16 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
                             <div class="traffic-bar-fill" style="background:${trafficColor};width:${Math.min(delayRatio / 1.5 * 100, 100)}%"></div>
                         </div>
                         <span class="traffic-text" style="color:${trafficColor}">${trafficLabel}</span>
+                    </div>
+                `;
+            } else {
+                trafficBarHtml = `
+                    <div class="traffic-row">
+                        <span class="traffic-label">🚗 Traffic</span>
+                        <div class="traffic-bar-wrap">
+                            <div class="traffic-bar-fill" style="background:#48bb78;width:100%"></div>
+                        </div>
+                        <span class="traffic-text" style="color:#48bb78">Clear</span>
                     </div>
                 `;
             }
