@@ -10,6 +10,7 @@ const timelineCards = document.getElementById('timeline-cards');
 
 let map = null;
 let altRenderers = [];
+let routePolylines = [];
 let weatherOverlays = [];
 let routeMarkers = [];
 let WeatherOverlay = null;
@@ -19,7 +20,6 @@ let lastRouteBounds = null;
 const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
 departureDateInput.min = today.toISOString().split('T')[0];
-// No max date — weather shows "N/A" for dates beyond forecast range
 
 function initApp() {
     WeatherOverlay = class extends google.maps.OverlayView {
@@ -130,27 +130,11 @@ function initApp() {
         });
 
         planButton.addEventListener('click', () => planTrip());
-        document.getElementById('reset-trip').addEventListener('click', () => resetTrip());
     } catch (err) {
         showError('Google Maps failed to initialize: ' + err.message);
     }
 }
 window.initApp = initApp;
-
-function resetTrip() {
-    clearOverlays();
-    originInput.value = '';
-    destinationInput.value = '';
-    departureDateInput.value = today.toISOString().split('T')[0];
-    departureTimeInput.value = '08:00';
-    weatherTimeline.classList.add('hidden');
-    timelineCards.innerHTML = '';
-    hideError();
-    allRoutes = null;
-    lastRouteBounds = null;
-    map.setCenter({ lat: 39.8283, lng: -98.5795 });
-    map.setZoom(5);
-}
 
 function clearOverlays() {
     weatherOverlays.forEach(o => o.setMap(null));
@@ -159,6 +143,8 @@ function clearOverlays() {
     routeMarkers = [];
     altRenderers.forEach(r => r.setMap(null));
     altRenderers = [];
+    routePolylines.forEach(p => p.setMap(null));
+    routePolylines = [];
 }
 
 async function planTrip() {
@@ -426,21 +412,75 @@ function buildWeatherBar(weatherData) {
     return { barHtml, legendHtml };
 }
 
+function buildTrafficBar(route) {
+    const leg = route.legs[0];
+    const steps = leg.steps;
+    const totalDuration = leg.duration.value;
+    const totalDurationTraffic = leg.duration_in_traffic ? leg.duration_in_traffic.value : totalDuration;
+    const overallRatio = totalDurationTraffic / totalDuration;
+
+    const segments = [];
+    let elapsed = 0;
+    for (const step of steps) {
+        const stepFraction = step.duration.value / totalDuration;
+        const stepRatio = overallRatio;
+        let color;
+        if (stepRatio <= 1.05) {
+            color = '#48bb78';
+        } else if (stepRatio <= 1.2) {
+            color = '#ecc94b';
+        } else {
+            color = '#fc8181';
+        }
+        segments.push({ width: stepFraction * 100, color });
+        elapsed += step.duration.value;
+    }
+
+    if (!leg.duration_in_traffic) {
+        return {
+            barHtml: `<div style="flex:100;background:#48bb78;height:100%;"></div>`,
+            label: 'Clear',
+            labelColor: '#48bb78',
+        };
+    }
+
+    const delayMin = Math.round((totalDurationTraffic - totalDuration) / 60);
+
+    const mergedSegments = [];
+    for (const seg of segments) {
+        const last = mergedSegments[mergedSegments.length - 1];
+        if (last && last.color === seg.color) {
+            last.width += seg.width;
+        } else {
+            mergedSegments.push({ ...seg });
+        }
+    }
+
+    const barHtml = mergedSegments.map(s =>
+        `<div style="flex:${s.width};background:${s.color};height:100%;"></div>`
+    ).join('');
+
+    let label, labelColor;
+    if (overallRatio <= 1.05) {
+        label = 'Light traffic';
+        labelColor = '#48bb78';
+    } else if (overallRatio <= 1.2) {
+        label = `Moderate (+${delayMin} min)`;
+        labelColor = '#ecc94b';
+    } else {
+        label = `Heavy (+${delayMin} min)`;
+        labelColor = '#fc8181';
+    }
+
+    return { barHtml, label, labelColor };
+}
+
+const routeColors = ['#3182ce', '#d69e2e', '#9f7aea', '#ed8936', '#38b2ac'];
+
 function displayRouteOptions(directionsResult, routeWeatherData, departureDateTime) {
     clearOverlays();
     timelineCards.innerHTML = '';
     weatherTimeline.classList.remove('hidden');
-
-    const routeColors = ['#3182ce', '#d69e2e', '#9f7aea'];
-
-    function getTrafficColor(route) {
-        const leg = route.legs[0];
-        if (!leg.duration_in_traffic) return '#3182ce';
-        const ratio = leg.duration_in_traffic.value / leg.duration.value;
-        if (ratio <= 1.05) return '#48bb78';
-        if (ratio <= 1.2) return '#ecc94b';
-        return '#e53e3e';
-    }
 
     function renderRouteLines(selectedIdx) {
         altRenderers.forEach(r => r.setMap(null));
@@ -448,15 +488,14 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
 
         routeWeatherData.forEach((rd, ri) => {
             const isSelected = ri === selectedIdx;
-            const route = directionsResult.routes[rd.routeIndex];
-            const selectedColor = getTrafficColor(route);
+            const color = routeColors[ri % routeColors.length];
             const renderer = new google.maps.DirectionsRenderer({
                 map: map,
                 directions: directionsResult,
                 routeIndex: rd.routeIndex,
                 suppressMarkers: true,
                 polylineOptions: {
-                    strokeColor: isSelected ? selectedColor : '#a0aec0',
+                    strokeColor: isSelected ? color : '#a0aec0',
                     strokeWeight: isSelected ? 6 : 3,
                     strokeOpacity: isSelected ? 0.9 : 0.35,
                     zIndex: isSelected ? 10 : 1,
@@ -481,6 +520,7 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
             const distMiles = (leg.distance.value / 1609.34).toFixed(0);
             const summary = route.summary || `Route ${idx + 1}`;
             const isBest = idx === 0;
+            const color = routeColors[idx % routeColors.length];
 
             const btn = document.createElement('button');
             btn.className = `route-option ${isBest ? 'selected' : ''}`;
@@ -495,45 +535,10 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
             }
 
             const { barHtml, legendHtml } = buildWeatherBar(rd.weatherData);
-
-            let trafficBarHtml = '';
-            if (leg.duration_in_traffic) {
-                const trafficDelayMin = Math.round((leg.duration_in_traffic.value - leg.duration.value) / 60);
-                const delayRatio = leg.duration_in_traffic.value / leg.duration.value;
-                let trafficColor, trafficLabel;
-                if (delayRatio <= 1.05) {
-                    trafficColor = '#48bb78';
-                    trafficLabel = 'Light traffic';
-                } else if (delayRatio <= 1.2) {
-                    trafficColor = '#ecc94b';
-                    trafficLabel = `Moderate (+${trafficDelayMin} min)`;
-                } else {
-                    trafficColor = '#e53e3e';
-                    trafficLabel = `Heavy (+${trafficDelayMin} min)`;
-                }
-                trafficBarHtml = `
-                    <div class="traffic-row">
-                        <span class="traffic-label">🚗 Traffic</span>
-                        <div class="traffic-bar-wrap">
-                            <div class="traffic-bar-fill" style="background:${trafficColor};width:${Math.min(delayRatio / 1.5 * 100, 100)}%"></div>
-                        </div>
-                        <span class="traffic-text" style="color:${trafficColor}">${trafficLabel}</span>
-                    </div>
-                `;
-            } else {
-                trafficBarHtml = `
-                    <div class="traffic-row">
-                        <span class="traffic-label">🚗 Traffic</span>
-                        <div class="traffic-bar-wrap">
-                            <div class="traffic-bar-fill" style="background:#48bb78;width:100%"></div>
-                        </div>
-                        <span class="traffic-text" style="color:#48bb78">Clear</span>
-                    </div>
-                `;
-            }
+            const traffic = buildTrafficBar(route);
 
             btn.innerHTML = `
-                <div class="route-number" style="background: ${routeColors[Math.min(idx, routeColors.length - 1)]}">${idx + 1}</div>
+                <div class="route-number" style="background: ${color}">${idx + 1}</div>
                 <div class="route-option-content">
                     <div class="route-option-top">
                         <strong>via ${summary}</strong>
@@ -548,7 +553,11 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
                             <div class="weather-bar-container"><div class="weather-bar">${barHtml}</div></div>
                         </div>
                         <div class="weather-bar-legend">${legendHtml}</div>
-                        ${trafficBarHtml}
+                        <div class="traffic-row">
+                            <span class="traffic-label">🚗 Traffic</span>
+                            <div class="traffic-bar-wrap"><div class="weather-bar">${traffic.barHtml}</div></div>
+                            <span class="traffic-text" style="color:${traffic.labelColor}">${traffic.label}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="route-check">
