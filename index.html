@@ -13,8 +13,7 @@
         </header>
 
         <div id="main-content">
-            <div id="map-container">
-                <div id="map"></div>
+            <div id="map-row">
                 <div id="search-panel">
                     <div class="search-field">
                         <label>From</label>
@@ -34,7 +33,14 @@
                             <input type="time" id="departure-time" value="08:00" />
                         </div>
                     </div>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="toggle-overlays" checked />
+                        Show weather icons on map
+                    </label>
                     <button id="plan-trip">Go</button>
+                </div>
+                <div id="map-container">
+                    <div id="map"></div>
                 </div>
             </div>
             <div id="error-message" class="error hidden"></div>
