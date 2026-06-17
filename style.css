@@ -93,6 +93,23 @@ header h1 {
     height: 550px;
 }
 
+#recenter-map {
+    background: white;
+    border: none;
+    border-radius: 2px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    cursor: pointer;
+    padding: 8px;
+    margin: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#recenter-map:hover {
+    background: #f7fafc;
+}
+
 #search-panel {
     position: absolute;
     top: 12px;
@@ -420,8 +437,25 @@ header h1 {
     margin-top: 4px;
 }
 
-.weather-bar-container {
+.route-bars {
     margin-top: 8px;
+}
+
+.bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bar-label {
+    font-size: 0.7rem;
+    color: #718096;
+    white-space: nowrap;
+    min-width: 68px;
+}
+
+.weather-bar-container {
+    flex: 1;
     background: #edf2f7;
     border-radius: 4px;
     overflow: hidden;
@@ -435,10 +469,45 @@ header h1 {
 }
 
 .weather-bar-legend {
-    margin-top: 4px;
+    margin-top: 3px;
+    margin-left: 76px;
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+.traffic-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.traffic-label {
+    font-size: 0.7rem;
+    color: #718096;
+    white-space: nowrap;
+    min-width: 68px;
+}
+
+.traffic-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: #edf2f7;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.traffic-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.traffic-text {
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .route-check {

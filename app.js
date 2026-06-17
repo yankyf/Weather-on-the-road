@@ -15,6 +15,7 @@ let routeMarkers = [];
 let WeatherOverlay = null;
 let allRoutes = null;
 let trafficLayer = null;
+let lastRouteBounds = null;
 
 const today = new Date();
 departureDateInput.value = today.toISOString().split('T')[0];
@@ -84,6 +85,20 @@ function initApp() {
         trafficLayer = new google.maps.TrafficLayer();
         trafficLayer.setMap(map);
 
+        const recenterBtn = document.createElement('button');
+        recenterBtn.id = 'recenter-map';
+        recenterBtn.title = 'Reset map view';
+        recenterBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 22v-6h6"/></svg>`;
+        map.controls[google.maps.ControlPosition.RIGHT_TOP].push(recenterBtn);
+        recenterBtn.addEventListener('click', () => {
+            if (lastRouteBounds) {
+                map.fitBounds(lastRouteBounds, { top: 80, left: 340, right: 40, bottom: 40 });
+            } else {
+                map.setCenter({ lat: 39.8283, lng: -98.5795 });
+                map.setZoom(5);
+            }
+        });
+
         const originSearchBox = new google.maps.places.SearchBox(originInput);
         const destSearchBox = new google.maps.places.SearchBox(destinationInput);
 
@@ -138,6 +153,7 @@ function resetTrip() {
     timelineCards.innerHTML = '';
     hideError();
     allRoutes = null;
+    lastRouteBounds = null;
     map.setCenter({ lat: 39.8283, lng: -98.5795 });
     map.setZoom(5);
 }
@@ -475,8 +491,32 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
 
             const { barHtml, legendHtml } = buildWeatherBar(rd.weatherData);
 
-            const trafficNote = leg.duration_in_traffic ?
-                ` · ${Math.round(leg.duration_in_traffic.value / 60) - Math.round(leg.duration.value / 60)} min traffic` : '';
+            let trafficBarHtml = '';
+            let trafficDelayMin = 0;
+            if (leg.duration_in_traffic) {
+                trafficDelayMin = Math.round((leg.duration_in_traffic.value - leg.duration.value) / 60);
+                const delayRatio = leg.duration_in_traffic.value / leg.duration.value;
+                let trafficColor, trafficLabel;
+                if (delayRatio <= 1.05) {
+                    trafficColor = '#48bb78';
+                    trafficLabel = 'Light traffic';
+                } else if (delayRatio <= 1.2) {
+                    trafficColor = '#ecc94b';
+                    trafficLabel = `Moderate traffic (+${trafficDelayMin} min)`;
+                } else {
+                    trafficColor = '#e53e3e';
+                    trafficLabel = `Heavy traffic (+${trafficDelayMin} min)`;
+                }
+                trafficBarHtml = `
+                    <div class="traffic-row">
+                        <span class="traffic-label">🚗 Traffic</span>
+                        <div class="traffic-bar-wrap">
+                            <div class="traffic-bar-fill" style="background:${trafficColor};width:${Math.min(delayRatio / 1.5 * 100, 100)}%"></div>
+                        </div>
+                        <span class="traffic-text" style="color:${trafficColor}">${trafficLabel}</span>
+                    </div>
+                `;
+            }
 
             btn.innerHTML = `
                 <div class="route-number" style="background: ${routeColors[Math.min(idx, routeColors.length - 1)]}">${idx + 1}</div>
@@ -486,12 +526,16 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
                         ${weatherLabel}
                     </div>
                     <div class="route-option-details">
-                        ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi${trafficNote}
+                        ${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi
                     </div>
-                    <div class="weather-bar-container">
-                        <div class="weather-bar">${barHtml}</div>
+                    <div class="route-bars">
+                        <div class="bar-row">
+                            <span class="bar-label">🌤 Weather</span>
+                            <div class="weather-bar-container"><div class="weather-bar">${barHtml}</div></div>
+                        </div>
+                        <div class="weather-bar-legend">${legendHtml}</div>
+                        ${trafficBarHtml}
                     </div>
-                    <div class="weather-bar-legend">${legendHtml}</div>
                 </div>
                 <div class="route-check">
                     <svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -520,6 +564,7 @@ function displayRouteOptions(directionsResult, routeWeatherData, departureDateTi
     routeWeatherData[0].weatherData.forEach(wp => {
         bounds.extend(new google.maps.LatLng(wp.lat, wp.lon));
     });
+    lastRouteBounds = bounds;
     map.fitBounds(bounds, { top: 80, left: 340, right: 40, bottom: 40 });
 }
 
