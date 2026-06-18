@@ -425,14 +425,26 @@ html, body {
     border-top: 1px solid #f1f5f9;
 }
 
-.recent-header {
+.recent-header-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 6px 4px;
+    cursor: pointer;
+    font-family: inherit;
     font-size: 11px;
     color: #94a3b8;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    margin-bottom: 4px;
     font-weight: 600;
+    transition: color 0.15s;
 }
+.recent-header-btn:hover { color: #64748b; }
+.toggle-arrow { font-size: 12px; }
+.recent-collapsed { display: none; }
 
 .recent-item {
     display: block;
@@ -590,9 +602,9 @@ html, body {
 #directions-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
 
 .directions-header {
-    padding: 16px 20px;
-    background: linear-gradient(to bottom, #f8fafc, #ffffff);
-    border-bottom: 1px solid #e2e8f0;
+    padding: 18px 20px;
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
 }
 
 .dir-route-summary {
@@ -602,22 +614,22 @@ html, body {
 }
 
 .dir-endpoints {
-    font-size: 14px;
+    font-size: 15px;
     color: #334155;
     line-height: 1.5;
 }
 
-.dir-endpoints strong { color: #0f172a; font-weight: 600; }
+.dir-endpoints strong { color: #0f172a; font-weight: 700; }
 
 .dir-stats {
-    font-size: 13px;
-    color: #64748b;
-    font-weight: 500;
+    font-size: 14px;
+    color: #3b82f6;
+    font-weight: 600;
 }
 
 .dir-safety {
     display: inline-block;
-    padding: 3px 10px;
+    padding: 4px 12px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
@@ -632,78 +644,82 @@ html, body {
 }
 
 .steps-list {
-    padding: 4px 0;
+    padding: 8px 0;
 }
 
 .direction-step {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 10px 20px;
+    gap: 12px;
+    padding: 14px 20px;
     cursor: pointer;
     transition: background 0.15s;
     position: relative;
 }
 
-.direction-step:hover { background: #f8fafc; }
+.direction-step:hover { background: #f0f7ff; }
 
 .direction-step::after {
     content: '';
     position: absolute;
-    left: 33px;
-    top: 38px;
+    left: 35px;
+    top: 44px;
     bottom: -2px;
-    width: 1px;
-    background: #e2e8f0;
+    width: 2px;
+    background: #bfdbfe;
+    border-radius: 1px;
 }
 
 .direction-step:last-child::after { display: none; }
 
 .direction-step.arrive {
     background: #f0fdf4;
+    border-top: 1px solid #dcfce7;
+    margin-top: 4px;
 }
 
 .direction-step.arrive::after { display: none; }
 
 .step-number {
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    background: #f1f5f9;
+    background: #3b82f6;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 700;
-    color: #64748b;
+    color: #ffffff;
     flex-shrink: 0;
     position: relative;
     z-index: 1;
 }
 
 .direction-step.arrive .step-number {
-    background: #dcfce7;
-    color: #166534;
+    background: #22c55e;
+    color: #ffffff;
+    font-size: 13px;
 }
 
 .step-icon {
-    width: 26px;
-    height: 26px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    background: #f1f5f9;
-    border-radius: 6px;
+    background: #eff6ff;
+    border-radius: 8px;
 }
 
-.step-icon svg { width: 18px; height: 18px; }
+.step-icon svg { width: 20px; height: 20px; }
 
 .step-content { flex: 1; min-width: 0; }
 
-.step-instruction { font-size: 13px; color: #334155; line-height: 1.5; }
-.step-instruction b { font-weight: 600; }
-.step-dist { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+.step-instruction { font-size: 14px; color: #1e293b; line-height: 1.6; }
+.step-instruction b { font-weight: 700; color: #0f172a; }
+.step-dist { font-size: 11px; color: #64748b; margin-top: 4px; background: #f1f5f9; display: inline-block; padding: 2px 10px; border-radius: 12px; font-weight: 500; }
 
 /* ===== ERROR ===== */
 .error {
@@ -802,8 +818,6 @@ html, body {
     z-index: 5;
     border-radius: 16px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
-    max-height: 200px;
-    overflow: hidden;
 }
 
 #timeline-header {
@@ -919,6 +933,77 @@ html, body {
     margin-top: 3px;
     font-weight: 500;
 }
+
+/* --- Clear Input Buttons --- */
+.clear-input-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: #94a3b8;
+    padding: 4px 6px;
+    border-radius: 6px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+.clear-input-btn:hover { color: #ef4444; }
+.clear-input-btn.hidden { display: none; }
+
+/* --- Map FAB (Show Full Trip) --- */
+.map-fab {
+    position: absolute;
+    top: 16px;
+    right: 60px;
+    z-index: 5;
+    background: white;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 10px;
+    cursor: pointer;
+    color: #475569;
+    transition: background 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.map-fab:hover { background: #f1f5f9; transform: scale(1.05); }
+.map-fab.hidden { display: none; }
+
+/* --- Best Time Close Button --- */
+.best-time-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+}
+.best-time-close:hover { color: #475569; background: #ede9fe; }
+.best-time-card { position: relative; }
+
+/* --- Drag Handle for Waypoints --- */
+.drag-handle {
+    cursor: grab;
+    font-size: 14px;
+    color: #94a3b8;
+    padding: 2px 4px;
+    flex-shrink: 0;
+    user-select: none;
+    transition: color 0.15s;
+    display: flex;
+    align-items: center;
+}
+.drag-handle:hover { color: #64748b; }
+.dragging-row { opacity: 0.4; background: #eff6ff; border-radius: 8px; }
+.waypoint-row { transition: opacity 0.15s; }
+.waypoint-row.drag-over { border-top: 2px solid #3b82f6; }
 
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {

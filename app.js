@@ -54,6 +54,13 @@ sliderTimeLabel.textContent = `${_h12}:00 ${_ampm}`;
 
 loadRecentSearches();
 
+function updateClearButtons() {
+    const co = document.getElementById('clear-origin');
+    const cd = document.getElementById('clear-dest');
+    if (co) co.classList.toggle('hidden', !originInput.value);
+    if (cd) cd.classList.toggle('hidden', !destinationInput.value);
+}
+
 function initApp() {
     WeatherOverlay = class extends google.maps.OverlayView {
         constructor(position, content, mapInstance) {
@@ -240,6 +247,27 @@ function initApp() {
             if (currentDirectionsResult) planTrip();
         });
 
+        // Clear input buttons
+        document.getElementById('clear-origin').addEventListener('click', () => { originInput.value = ''; originInput.focus(); });
+        document.getElementById('clear-dest').addEventListener('click', () => { destinationInput.value = ''; destinationInput.focus(); });
+        setInterval(updateClearButtons, 300);
+
+        // Show full trip button
+        document.getElementById('show-full-trip').addEventListener('click', () => {
+            if (lastRouteBounds) map.fitBounds(lastRouteBounds, { top: 20, left: 420, right: 40, bottom: 220 });
+        });
+
+        // Recent searches toggle
+        const recentToggle = document.getElementById('recent-toggle');
+        if (recentToggle) {
+            recentToggle.addEventListener('click', () => {
+                const list = document.getElementById('recent-list');
+                const arrow = document.querySelector('.toggle-arrow');
+                list.classList.toggle('recent-collapsed');
+                if (arrow) arrow.textContent = list.classList.contains('recent-collapsed') ? '▸' : '▾';
+            });
+        }
+
         initTimelineDrag();
     } catch (err) {
         showError('Google Maps failed to initialize: ' + err.message);
@@ -248,21 +276,31 @@ function initApp() {
 window.initApp = initApp;
 
 function enableRadar() {
+    disableRadar();
     fetch('https://api.rainviewer.com/public/weather-maps.json')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('Network error');
+            return r.json();
+        })
         .then(data => {
-            const latest = data.radar && data.radar.past && data.radar.past.length
-                ? data.radar.past[data.radar.past.length - 1] : null;
-            if (!latest) return;
+            const host = data.host || 'https://tilecache.rainviewer.com';
+            const past = data.radar && data.radar.past;
+            if (!past || !past.length) return;
+            const latest = past[past.length - 1];
             radarLayer = new google.maps.ImageMapType({
-                getTileUrl: (coord, zoom) => `https://tilecache.rainviewer.com${latest.path}/256/${zoom}/${coord.x}/${coord.y}/6/1_1.png`,
+                getTileUrl: (coord, zoom) => {
+                    if (zoom > 12 || zoom < 1) return null;
+                    return `${host}${latest.path}/256/${zoom}/${coord.x}/${coord.y}/2/1_1.png`;
+                },
                 tileSize: new google.maps.Size(256, 256),
-                opacity: 0.5,
+                opacity: 0.6,
                 name: 'Radar'
             });
-            map.overlayMapTypes.push(radarLayer);
+            map.overlayMapTypes.insertAt(0, radarLayer);
         })
-        .catch(() => {});
+        .catch(() => {
+            document.getElementById('toggle-radar').checked = false;
+        });
 }
 
 function disableRadar() {
@@ -284,7 +322,9 @@ function addWaypoint() {
     const id = 'waypoint-' + waypointInputs.length;
     const row = document.createElement('div');
     row.className = 'search-input-row waypoint-row';
+    row.draggable = true;
     row.innerHTML = `
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
         <div class="input-dot-wrap"><span class="dot waypoint-dot"></span><span class="dot-line"></span></div>
         <input type="text" id="${id}" placeholder="Add a stop..." autocomplete="off" />
         <button class="remove-waypoint" title="Remove stop">&times;</button>
@@ -299,6 +339,31 @@ function addWaypoint() {
         row.remove();
         waypointInputs = waypointInputs.filter(w => w !== input);
     });
+
+    row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        row.classList.add('dragging-row');
+        setTimeout(() => row.style.opacity = '0.4', 0);
+    });
+    row.addEventListener('dragend', () => {
+        row.style.opacity = '1';
+        row.classList.remove('dragging-row');
+        document.querySelectorAll('.waypoint-row').forEach(r => r.classList.remove('drag-over'));
+        waypointInputs = [...waypointsContainer.querySelectorAll('.waypoint-row input')];
+    });
+    row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const dragging = waypointsContainer.querySelector('.dragging-row');
+        if (dragging && dragging !== row) {
+            document.querySelectorAll('.waypoint-row').forEach(r => r.classList.remove('drag-over'));
+            row.classList.add('drag-over');
+            const rect = row.getBoundingClientRect();
+            const mid = rect.top + rect.height / 2;
+            if (e.clientY < mid) waypointsContainer.insertBefore(dragging, row);
+            else waypointsContainer.insertBefore(dragging, row.nextSibling);
+        }
+    });
 }
 
 function clearMap() {
@@ -307,6 +372,7 @@ function clearMap() {
     routeInfoOverlays.forEach(o => o.setMap(null)); routeInfoOverlays = [];
     if (pickMarker) { pickMarker.setMap(null); pickMarker = null; }
     directionsPanel.innerHTML = ''; directionsPanel.classList.add('hidden');
+    document.getElementById('show-full-trip').classList.add('hidden');
 }
 
 function getDepartureTime() {
@@ -327,6 +393,7 @@ async function planTrip() {
     routesList.innerHTML = '<div class="loading">Finding routes...</div>';
     weatherTimeline.classList.add('hidden');
     tripActions.classList.add('hidden');
+    document.getElementById('show-full-trip').classList.add('hidden');
 
     try {
         const waypoints = waypointInputs.filter(w => w.value.trim()).map(w => ({ location: w.value.trim(), stopover: true }));
@@ -559,6 +626,7 @@ function displayRoutes(directionsResult, routeData, departureTime) {
     directionsResult.routes.forEach(r => r.overview_path.forEach(p => bounds.extend(p)));
     lastRouteBounds = bounds;
     map.fitBounds(bounds, { top: 20, left: 420, right: 40, bottom: 220 });
+    document.getElementById('show-full-trip').classList.remove('hidden');
 }
 
 function showDirections(directionsResult, routeIndex, rd) {
@@ -640,7 +708,14 @@ function showWeatherChart(weatherData) {
         }
     });
 
-    weatherChart.innerHTML = `<svg width="${w}" height="${chartH + 26}" viewBox="0 0 ${w} ${chartH + 26}">
+    let iconLabels = '';
+    valid.forEach((wp, i) => {
+        const x = i * 60 + 30;
+        const info = weatherCodeToInfo(wp.weatherCode);
+        iconLabels += `<text x="${x}" y="${chartH + 40}" text-anchor="middle" font-size="14">${info.icon}</text>`;
+    });
+
+    weatherChart.innerHTML = `<svg width="${w}" height="${chartH + 48}" viewBox="0 0 ${w} ${chartH + 48}">
         ${precipBars}
         <path d="${tempPath}" fill="none" stroke="#ef4444" stroke-width="2"/>
         ${valid.map((wp, i) => {
@@ -649,6 +724,7 @@ function showWeatherChart(weatherData) {
             return `<circle cx="${x}" cy="${y}" r="3" fill="#ef4444"/>`;
         }).join('')}
         ${labels}
+        ${iconLabels}
     </svg>`;
 }
 
@@ -706,6 +782,7 @@ async function findBestDepartureTime() {
         const h12 = best.hour === 0 ? 12 : best.hour > 12 ? best.hour - 12 : best.hour;
 
         let html = `<div class="best-time-card">
+            <button class="best-time-close" onclick="document.getElementById('best-time-result').classList.add('hidden')">&times;</button>
             <div class="best-time-title">Best time to leave</div>
             <div class="best-time-value">${h12}:00 ${ampm}</div>
             <div class="best-time-safety ${best.safety.cls}">${best.safety.icon} ${best.safety.text}</div>
