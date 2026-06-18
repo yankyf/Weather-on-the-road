@@ -19,6 +19,7 @@ let RouteInfoOverlay = null;
 let lastRouteBounds = null;
 let showOverlaysFlag = true;
 let currentWeatherData = null;
+let mapClickMode = null; // 'origin' or 'destination'
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -58,10 +59,11 @@ function initApp() {
     };
 
     RouteInfoOverlay = class extends google.maps.OverlayView {
-        constructor(position, content, mapInstance) {
+        constructor(position, content, mapInstance, offsetY) {
             super();
             this.position = position;
             this.content = content;
+            this.offsetY = offsetY || -35;
             this.div = null;
             this.setMap(mapInstance);
         }
@@ -74,7 +76,7 @@ function initApp() {
         }
         draw() {
             const p = this.getProjection().fromLatLngToDivPixel(this.position);
-            if (p) { this.div.style.left = (p.x - 40) + 'px'; this.div.style.top = (p.y - 20) + 'px'; }
+            if (p) { this.div.style.left = (p.x - 40) + 'px'; this.div.style.top = (p.y + this.offsetY) + 'px'; }
         }
         onRemove() { if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; } }
     };
@@ -136,7 +138,41 @@ function initApp() {
             });
         });
 
-        planButton.addEventListener('click', () => planTrip());
+        map.addListener('click', (e) => {
+            if (!mapClickMode) return;
+            const latlng = e.latLng;
+            const geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ location: latlng }, (results, status) => {
+                const addr = (status === 'OK' && results[0]) ? results[0].formatted_address : `${latlng.lat().toFixed(6)}, ${latlng.lng().toFixed(6)}`;
+                if (mapClickMode === 'origin') originInput.value = addr;
+                else if (mapClickMode === 'destination') destinationInput.value = addr;
+                mapClickMode = null;
+                map.setOptions({ draggableCursor: null });
+                originInput.classList.remove('picking');
+                destinationInput.classList.remove('picking');
+            });
+        });
+
+        originInput.addEventListener('focus', () => {
+            mapClickMode = 'origin';
+            map.setOptions({ draggableCursor: 'crosshair' });
+            originInput.classList.add('picking');
+            destinationInput.classList.remove('picking');
+        });
+        destinationInput.addEventListener('focus', () => {
+            mapClickMode = 'destination';
+            map.setOptions({ draggableCursor: 'crosshair' });
+            destinationInput.classList.add('picking');
+            originInput.classList.remove('picking');
+        });
+
+        planButton.addEventListener('click', () => {
+            mapClickMode = null;
+            map.setOptions({ draggableCursor: null });
+            originInput.classList.remove('picking');
+            destinationInput.classList.remove('picking');
+            planTrip();
+        });
 
         document.getElementById('toggle-overlays').addEventListener('change', (e) => {
             showOverlaysFlag = e.target.checked;
@@ -174,7 +210,8 @@ async function planTrip() {
         routesList.innerHTML = '<div class="loading">Loading weather...</div>';
 
         const routeData = [];
-        for (let r = 0; r < result.routes.length; r++) {
+        const maxRoutes = Math.min(result.routes.length, 3);
+        for (let r = 0; r < maxRoutes; r++) {
             const waypoints = sampleWaypoints(result, r, departureTime);
             const weatherData = await getWeatherForWaypoints(waypoints);
             const withForecast = weatherData.filter(w => !w.noForecast);
@@ -242,12 +279,13 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             });
             directionsRenderers.push(renderer);
 
-            const midIdx = Math.floor(route.overview_path.length / 2);
-            const midPoint = route.overview_path[midIdx];
+            const pathLen = route.overview_path.length;
+            const midIdx = Math.floor(pathLen * (0.35 + i * 0.15));
+            const midPoint = route.overview_path[Math.min(midIdx, pathLen - 1)];
             const duration = leg.duration_in_traffic || leg.duration;
             const distMiles = Math.round(leg.distance.value / 1609.34);
             const infoHtml = `<div class="route-info-box ${isSelected ? '' : 'alt'}"><div class="rib-duration">${duration.text}</div><div class="rib-distance">${distMiles} miles</div></div>`;
-            const infoOverlay = new RouteInfoOverlay(midPoint, infoHtml, map);
+            const infoOverlay = new RouteInfoOverlay(midPoint, infoHtml, map, -40);
             routeInfoOverlays.push(infoOverlay);
         });
 
@@ -269,7 +307,7 @@ function displayRoutes(directionsResult, routeData, departureTime) {
         const distMiles = Math.round(leg.distance.value / 1609.34);
         const summary = route.summary || `Route ${idx + 1}`;
 
-        const { barHtml: weatherBarHtml } = buildWeatherBar(rd.weatherData);
+        const { barHtml: weatherBarHtml, iconsHtml: weatherIconsHtml } = buildWeatherBar(rd.weatherData);
         const traffic = getStepTrafficSegments(route);
         const trafficBarHtml = traffic.segments.map(s =>
             `<div style="flex:${s.pct};background:${s.color};height:100%;"></div>`
@@ -299,9 +337,12 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             <div class="route-meta">${baseDuration.text} without traffic · ${distMiles} miles</div>
             ${badgesHtml ? '<div class="route-badges">' + badgesHtml + '</div>' : ''}
             <div class="route-bars-compact">
-                <div class="bar-row-compact">
+                <div class="bar-row-compact weather-bar-row">
                     <span class="bar-icon" title="Weather">🌤</span>
-                    <div class="bar-track"><div class="bar-fill">${weatherBarHtml}</div></div>
+                    <div class="bar-track-wrap">
+                        <div class="weather-icons-row">${weatherIconsHtml}</div>
+                        <div class="bar-track"><div class="bar-fill">${weatherBarHtml}</div></div>
+                    </div>
                 </div>
                 <div class="bar-row-compact">
                     <span class="bar-icon" title="Traffic">🚗</span>
@@ -429,14 +470,21 @@ function weatherCodeToInfo(code) {
 
 function buildWeatherBar(weatherData) {
     const segments = [];
-    for (let i = 0; i < weatherData.length - 1; i++) {
-        const cat = getWeatherCategory(weatherData[i].weatherCode);
-        const widthPct = (weatherData[i + 1].fraction - weatherData[i].fraction) * 100;
-        const info = cat === 'unknown' ? { color: '#e8eaed' } : weatherCategories[cat];
-        segments.push({ width: widthPct, color: info.color });
+    const icons = [];
+    for (let i = 0; i < weatherData.length; i++) {
+        const wp = weatherData[i];
+        const cat = getWeatherCategory(wp.weatherCode);
+        const catInfo = cat === 'unknown' ? { color: '#e8eaed', icon: '❓' } : weatherCategories[cat];
+        const info = wp.noForecast ? { icon: '—' } : weatherCodeToInfo(wp.weatherCode);
+        icons.push({ icon: info.icon, fraction: wp.fraction });
+        if (i < weatherData.length - 1) {
+            const widthPct = (weatherData[i + 1].fraction - wp.fraction) * 100;
+            segments.push({ width: widthPct, color: catInfo.color });
+        }
     }
     const barHtml = segments.map(s => `<div style="flex:${s.width};background:${s.color};height:100%;"></div>`).join('');
-    return { barHtml };
+    const iconsHtml = icons.map(ic => `<span class="weather-bar-icon" style="left:${ic.fraction * 100}%">${ic.icon}</span>`).join('');
+    return { barHtml, iconsHtml };
 }
 
 function getStepTrafficSegments(route) {
@@ -486,11 +534,14 @@ function showWeatherCards(weatherData) {
     timelineCards.innerHTML = '';
     weatherData.forEach(wp => {
         const info = wp.noForecast ? { icon: '—', desc: 'No forecast' } : weatherCodeToInfo(wp.weatherCode);
+        const cat = getWeatherCategory(wp.weatherCode);
+        const catInfo = (cat !== 'unknown' && weatherCategories[cat]) ? weatherCategories[cat] : { color: '#9aa0a6' };
+        const borderColor = wp.noForecast ? '#dadce0' : catInfo.color;
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const label = wp.isStart ? 'Start' : wp.isEnd ? 'End' : `${wp.distanceMiles} mi`;
-        const cls = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
         const card = document.createElement('div');
-        card.className = `weather-card ${cls}`;
+        card.className = 'weather-card';
+        card.style.borderLeftColor = borderColor;
         if (wp.noForecast) {
             card.innerHTML = `<div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div><div class="weather-icon" style="opacity:0.4">—</div><div class="weather-details"><div class="temp" style="color:#80868b">N/A</div></div>`;
         } else {

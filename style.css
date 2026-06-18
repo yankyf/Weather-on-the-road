@@ -97,6 +97,15 @@ html, body {
     border-bottom: 2px solid #4285f4;
 }
 
+.search-input-row input[type="text"].picking {
+    border-bottom: 2px solid #ea4335;
+    background: #fef7e0;
+}
+
+.search-input-row input[type="text"].picking::placeholder {
+    color: #ea8600;
+}
+
 #my-location-btn {
     background: none;
     border: none;
@@ -270,6 +279,24 @@ html, body {
     width: 18px;
     text-align: center;
     flex-shrink: 0;
+}
+
+.bar-track-wrap {
+    flex: 1;
+    position: relative;
+}
+
+.weather-icons-row {
+    position: relative;
+    height: 16px;
+    margin-bottom: 2px;
+}
+
+.weather-bar-icon {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 11px;
+    line-height: 1;
 }
 
 .bar-track {
@@ -474,9 +501,6 @@ html, body {
     color: #80868b;
     margin-top: 2px;
 }
-
-.weather-card.start { border-left-color: #34a853; }
-.weather-card.end { border-left-color: #ea4335; }
 
 .loading {
     text-align: center;
