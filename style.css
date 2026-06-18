@@ -106,6 +106,12 @@ html, body {
     color: #ea8600;
 }
 
+.search-input-row input[type="text"].chosen {
+    border-bottom: 2px solid #34a853;
+    background: #e6f4ea;
+    transition: background 0.3s;
+}
+
 #my-location-btn {
     background: none;
     border: none;
@@ -401,11 +407,12 @@ html, body {
 .route-info-box {
     background: white;
     border-radius: 4px;
-    padding: 6px 10px;
+    padding: 4px 8px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.3);
     font-family: Roboto, Arial, sans-serif;
     white-space: nowrap;
-    cursor: pointer;
+    pointer-events: none;
+    display: inline-block;
 }
 
 .route-info-box .rib-duration {

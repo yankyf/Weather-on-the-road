@@ -19,7 +19,8 @@ let RouteInfoOverlay = null;
 let lastRouteBounds = null;
 let showOverlaysFlag = true;
 let currentWeatherData = null;
-let mapClickMode = null; // 'origin' or 'destination'
+let mapClickMode = null;
+let pickMarker = null; // 'origin' or 'destination'
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -59,11 +60,10 @@ function initApp() {
     };
 
     RouteInfoOverlay = class extends google.maps.OverlayView {
-        constructor(position, content, mapInstance, offsetY) {
+        constructor(position, content, mapInstance) {
             super();
             this.position = position;
             this.content = content;
-            this.offsetY = offsetY || -35;
             this.div = null;
             this.setMap(mapInstance);
         }
@@ -72,11 +72,17 @@ function initApp() {
             this.div.innerHTML = this.content;
             this.div.style.position = 'absolute';
             this.div.style.zIndex = '2';
+            this.div.style.pointerEvents = 'none';
             this.getPanes().overlayMouseTarget.appendChild(this.div);
         }
         draw() {
             const p = this.getProjection().fromLatLngToDivPixel(this.position);
-            if (p) { this.div.style.left = (p.x - 40) + 'px'; this.div.style.top = (p.y + this.offsetY) + 'px'; }
+            if (p) {
+                const w = this.div.offsetWidth || 80;
+                const h = this.div.offsetHeight || 36;
+                this.div.style.left = (p.x - w / 2) + 'px';
+                this.div.style.top = (p.y - h - 12) + 'px';
+            }
         }
         onRemove() { if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; } }
     };
@@ -141,11 +147,28 @@ function initApp() {
         map.addListener('click', (e) => {
             if (!mapClickMode) return;
             const latlng = e.latLng;
+            if (pickMarker) pickMarker.setMap(null);
+            pickMarker = new google.maps.Marker({
+                position: latlng,
+                map,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: '#ffffff',
+                    fillOpacity: 1,
+                    strokeColor: mapClickMode === 'origin' ? '#5f6368' : '#4285f4',
+                    strokeWeight: 3
+                },
+                animation: google.maps.Animation.DROP
+            });
+            const targetInput = mapClickMode === 'origin' ? originInput : destinationInput;
+            targetInput.value = 'Loading address...';
+            targetInput.classList.add('chosen');
             const geocoder = new google.maps.Geocoder();
             geocoder.geocode({ location: latlng }, (results, status) => {
                 const addr = (status === 'OK' && results[0]) ? results[0].formatted_address : `${latlng.lat().toFixed(6)}, ${latlng.lng().toFixed(6)}`;
-                if (mapClickMode === 'origin') originInput.value = addr;
-                else if (mapClickMode === 'destination') destinationInput.value = addr;
+                targetInput.value = addr;
+                setTimeout(() => targetInput.classList.remove('chosen'), 1500);
                 mapClickMode = null;
                 map.setOptions({ draggableCursor: null });
                 originInput.classList.remove('picking');
@@ -189,6 +212,7 @@ function clearMap() {
     weatherOverlays.forEach(o => o.setMap(null)); weatherOverlays = [];
     directionsRenderers.forEach(r => r.setMap(null)); directionsRenderers = [];
     routeInfoOverlays.forEach(o => o.setMap(null)); routeInfoOverlays = [];
+    if (pickMarker) { pickMarker.setMap(null); pickMarker = null; }
 }
 
 async function planTrip() {
@@ -279,13 +303,13 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             });
             directionsRenderers.push(renderer);
 
-            const pathLen = route.overview_path.length;
-            const midIdx = Math.floor(pathLen * (0.35 + i * 0.15));
-            const midPoint = route.overview_path[Math.min(midIdx, pathLen - 1)];
+            const path = route.overview_path;
+            const labelIdx = Math.floor(path.length * (0.3 + i * 0.2));
+            const labelPoint = path[Math.min(labelIdx, path.length - 1)];
             const duration = leg.duration_in_traffic || leg.duration;
             const distMiles = Math.round(leg.distance.value / 1609.34);
             const infoHtml = `<div class="route-info-box ${isSelected ? '' : 'alt'}"><div class="rib-duration">${duration.text}</div><div class="rib-distance">${distMiles} miles</div></div>`;
-            const infoOverlay = new RouteInfoOverlay(midPoint, infoHtml, map, -40);
+            const infoOverlay = new RouteInfoOverlay(labelPoint, infoHtml, map);
             routeInfoOverlays.push(infoOverlay);
         });
 
