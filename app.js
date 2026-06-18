@@ -20,7 +20,9 @@ let lastRouteBounds = null;
 let showOverlaysFlag = true;
 let currentWeatherData = null;
 let mapClickMode = null;
-let pickMarker = null; // 'origin' or 'destination'
+let pickMarker = null;
+let myLocationMarker = null;
+const directionsPanel = document.getElementById('directions-panel'); // 'origin' or 'destination'
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -87,6 +89,9 @@ function initApp() {
             } else if (this.side === 'right') {
                 this.div.style.left = (p.x + 14) + 'px';
                 this.div.style.top = (p.y - h / 2) + 'px';
+            } else if (this.side === 'bottom') {
+                this.div.style.left = (p.x - w / 2) + 'px';
+                this.div.style.top = (p.y + 14) + 'px';
             } else {
                 this.div.style.left = (p.x - w / 2) + 'px';
                 this.div.style.top = (p.y - h - 14) + 'px';
@@ -135,6 +140,21 @@ function initApp() {
             myLocationBtn.style.opacity = '0.5';
             navigator.geolocation.getCurrentPosition(pos => {
                 const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                if (myLocationMarker) myLocationMarker.setMap(null);
+                myLocationMarker = new google.maps.Marker({
+                    position: latlng,
+                    map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 7,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 3
+                    },
+                    title: 'Your location',
+                    zIndex: 999
+                });
                 const geocoder = new google.maps.Geocoder();
                 geocoder.geocode({ location: latlng }, (results, status) => {
                     myLocationBtn.style.opacity = '1';
@@ -221,6 +241,7 @@ function clearMap() {
     directionsRenderers.forEach(r => r.setMap(null)); directionsRenderers = [];
     routeInfoOverlays.forEach(o => o.setMap(null)); routeInfoOverlays = [];
     if (pickMarker) { pickMarker.setMap(null); pickMarker = null; }
+    directionsPanel.innerHTML = ''; directionsPanel.classList.add('hidden');
 }
 
 async function planTrip() {
@@ -312,24 +333,38 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             directionsRenderers.push(renderer);
 
             const path = route.overview_path;
-            const labelFraction = 0.3 + i * 0.2;
-            const labelIdx = Math.min(Math.floor(path.length * labelFraction), path.length - 1);
-            const labelPoint = path[labelIdx];
-
-            const nearIdx = Math.min(labelIdx + 1, path.length - 1);
-            const dx = path[nearIdx].lng() - path[labelIdx].lng();
-            const dy = path[nearIdx].lat() - path[labelIdx].lat();
-            let side;
-            if (Math.abs(dx) > Math.abs(dy)) {
-                side = dy >= 0 ? 'top' : 'top';
-            } else {
-                side = dx >= 0 ? 'left' : 'right';
-            }
-            if (i === 1) side = 'right';
-            if (i === 2) side = 'left';
-
             const duration = leg.duration_in_traffic || leg.duration;
             const distMiles = Math.round(leg.distance.value / 1609.34);
+
+            let labelPoint, side;
+            if (isSelected) {
+                const midIdx = Math.floor(path.length * 0.5);
+                labelPoint = path[midIdx];
+                side = 'bottom';
+            } else {
+                const selectedRoute = directionsResult.routes[routeData[selectedIdx].routeIndex];
+                const selPath = selectedRoute.overview_path;
+                let maxDist = 0, bestIdx = Math.floor(path.length * 0.5);
+                for (let pi = Math.floor(path.length * 0.2); pi < Math.floor(path.length * 0.8); pi++) {
+                    const pt = path[pi];
+                    let minD = Infinity;
+                    for (let si = 0; si < selPath.length; si += Math.max(1, Math.floor(selPath.length / 50))) {
+                        const d = Math.abs(pt.lat() - selPath[si].lat()) + Math.abs(pt.lng() - selPath[si].lng());
+                        if (d < minD) minD = d;
+                    }
+                    if (minD > maxDist) { maxDist = minD; bestIdx = pi; }
+                }
+                labelPoint = path[bestIdx];
+                const selMid = selPath[Math.floor(selPath.length / 2)];
+                const dx = selMid.lng() - labelPoint.lng();
+                const dy = selMid.lat() - labelPoint.lat();
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    side = dx > 0 ? 'right' : 'left';
+                } else {
+                    side = dy > 0 ? 'bottom' : 'top';
+                }
+            }
+
             const arrowClass = `arrow-${side}`;
             const infoHtml = `<div class="route-info-box ${isSelected ? '' : 'alt'} ${arrowClass}"><div class="rib-duration">${duration.text}</div><div class="rib-distance">${distMiles} miles</div></div>`;
             const infoOverlay = new RouteInfoOverlay(labelPoint, infoHtml, map, side);
@@ -344,6 +379,8 @@ function displayRoutes(directionsResult, routeData, departureTime) {
         currentWeatherData = rd.weatherData;
         showWeatherCards(rd.weatherData);
         if (showOverlaysFlag) showOverlaysOnMap(rd.weatherData);
+
+        showDirections(directionsResult, rd.routeIndex);
     }
 
     routeData.forEach((rd, idx) => {
@@ -412,6 +449,36 @@ function displayRoutes(directionsResult, routeData, departureTime) {
     map.fitBounds(bounds, { top: 20, left: 420, right: 40, bottom: 180 });
 }
 
+function showDirections(directionsResult, routeIndex) {
+    directionsPanel.classList.remove('hidden');
+    directionsPanel.innerHTML = '';
+    const route = directionsResult.routes[routeIndex];
+    const leg = route.legs[0];
+    const steps = leg.steps;
+
+    const header = document.createElement('div');
+    header.className = 'directions-header';
+    header.innerHTML = `<div class="dir-endpoints"><strong>${leg.start_address}</strong> to <strong>${leg.end_address}</strong></div>`;
+    directionsPanel.appendChild(header);
+
+    steps.forEach((step, idx) => {
+        const row = document.createElement('div');
+        row.className = 'direction-step';
+        const distText = step.distance ? step.distance.text : '';
+        row.innerHTML = `<div class="step-number">${idx + 1}</div><div class="step-content"><div class="step-instruction">${step.instructions}</div><div class="step-dist">${distText}</div></div>`;
+        row.addEventListener('click', () => {
+            map.panTo(step.start_location);
+            map.setZoom(16);
+        });
+        directionsPanel.appendChild(row);
+    });
+
+    const arrive = document.createElement('div');
+    arrive.className = 'direction-step arrive';
+    arrive.innerHTML = `<div class="step-number">📍</div><div class="step-content"><div class="step-instruction"><strong>Arrive at ${leg.end_address.split(',')[0]}</strong></div></div>`;
+    directionsPanel.appendChild(arrive);
+}
+
 function getWeatherAlerts(weatherData) {
     const alerts = [];
     for (const wp of weatherData.filter(w => !w.noForecast)) {
@@ -448,13 +515,12 @@ function sampleWaypoints(directionsResult, routeIndex, departureTime) {
     const totalDuration = (leg.duration_in_traffic || leg.duration).value;
     const totalDistance = leg.distance.value;
     const totalMiles = totalDistance / 1609.34;
+    const totalMinutes = totalDuration / 60;
     const path = route.overview_path;
 
-    let interval = 30;
-    if (totalMiles > 500) interval = 50;
-    else if (totalMiles > 300) interval = 40;
-
-    const numStops = Math.min(Math.max(Math.ceil(totalMiles / interval) + 1, 3), 20);
+    const byMiles = Math.ceil(totalMiles / 20) + 1;
+    const byMinutes = Math.ceil(totalMinutes / 20) + 1;
+    const numStops = Math.min(Math.max(Math.max(byMiles, byMinutes), 3), 25);
     const waypoints = [];
 
     for (let i = 0; i < numStops; i++) {
