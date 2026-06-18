@@ -230,6 +230,8 @@ function initApp() {
             if (showOverlaysFlag && currentWeatherData) showOverlaysOnMap(currentWeatherData);
             else { weatherOverlays.forEach(o => o.setMap(null)); weatherOverlays = []; }
         });
+
+        initTimelineDrag();
     } catch (err) {
         showError('Google Maps failed to initialize: ' + err.message);
     }
@@ -262,11 +264,14 @@ async function planTrip() {
 
         routesList.innerHTML = '<div class="loading">Loading weather...</div>';
 
-        const routeData = [];
         const maxRoutes = Math.min(result.routes.length, 3);
+        const allWaypoints = [];
+        for (let r = 0; r < maxRoutes; r++) allWaypoints.push(sampleWaypoints(result, r, departureTime));
+        const allWeather = await Promise.all(allWaypoints.map(wp => getWeatherForWaypoints(wp)));
+
+        const routeData = [];
         for (let r = 0; r < maxRoutes; r++) {
-            const waypoints = sampleWaypoints(result, r, departureTime);
-            const weatherData = await getWeatherForWaypoints(waypoints);
+            const weatherData = allWeather[r];
             const withForecast = weatherData.filter(w => !w.noForecast);
             const maxRain = withForecast.length ? Math.max(...withForecast.map(w => w.precipitationProb)) : 0;
             const badWeatherCount = withForecast.filter(w =>
@@ -365,8 +370,10 @@ function displayRoutes(directionsResult, routeData, departureTime) {
                 }
             }
 
+            const durationSec = (leg.duration_in_traffic || leg.duration).value;
+            const distMiles = Math.round(leg.distance.value / 1609.34);
             const arrowClass = `arrow-${side}`;
-            const infoHtml = `<div class="route-info-box ${isSelected ? '' : 'alt'} ${arrowClass}"><div class="rib-duration">${duration.text}</div><div class="rib-distance">${distMiles} miles</div></div>`;
+            const infoHtml = `<div class="route-info-box ${isSelected ? '' : 'alt'} ${arrowClass}"><div class="rib-duration">${formatDuration(durationSec)}</div><div class="rib-distance">${distMiles} miles</div></div>`;
             const infoOverlay = new RouteInfoOverlay(labelPoint, infoHtml, map, side);
             routeInfoOverlays.push(infoOverlay);
         });
@@ -386,8 +393,10 @@ function displayRoutes(directionsResult, routeData, departureTime) {
     routeData.forEach((rd, idx) => {
         const route = directionsResult.routes[rd.routeIndex];
         const leg = route.legs[0];
-        const duration = leg.duration_in_traffic || leg.duration;
-        const baseDuration = leg.duration;
+        const durationSec = (leg.duration_in_traffic || leg.duration).value;
+        const baseDurationSec = leg.duration.value;
+        const durationText = formatDuration(durationSec);
+        const baseDurationText = formatDuration(baseDurationSec);
         const distMiles = Math.round(leg.distance.value / 1609.34);
         const summary = route.summary || `Route ${idx + 1}`;
 
@@ -416,9 +425,9 @@ function displayRoutes(directionsResult, routeData, departureTime) {
         btn.innerHTML = `
             <div class="route-option-header">
                 <span class="route-name">via ${summary}</span>
-                <span class="route-duration">${duration.text}</span>
+                <span class="route-duration">${durationText}</span>
             </div>
-            <div class="route-meta">${baseDuration.text} without traffic · ${distMiles} miles</div>
+            <div class="route-meta">${baseDurationText} without traffic · ${distMiles} miles</div>
             ${badgesHtml ? '<div class="route-badges">' + badgesHtml + '</div>' : ''}
             <div class="route-bars-compact">
                 <div class="bar-row-compact weather-bar-row">
@@ -465,7 +474,8 @@ function showDirections(directionsResult, routeIndex) {
         const row = document.createElement('div');
         row.className = 'direction-step';
         const distText = step.distance ? step.distance.text : '';
-        row.innerHTML = `<div class="step-number">${idx + 1}</div><div class="step-content"><div class="step-instruction">${step.instructions}</div><div class="step-dist">${distText}</div></div>`;
+        const icon = getManeuverIcon(step.maneuver || '', step.instructions || '');
+        row.innerHTML = `<div class="step-icon">${icon}</div><div class="step-content"><div class="step-instruction">${step.instructions}</div><div class="step-dist">${distText}</div></div>`;
         row.addEventListener('click', () => {
             map.panTo(step.start_location);
             map.setZoom(16);
@@ -520,7 +530,7 @@ function sampleWaypoints(directionsResult, routeIndex, departureTime) {
 
     const byMiles = Math.ceil(totalMiles / 20) + 1;
     const byMinutes = Math.ceil(totalMinutes / 20) + 1;
-    const numStops = Math.min(Math.max(Math.max(byMiles, byMinutes), 3), 25);
+    const numStops = Math.min(Math.max(Math.max(byMiles, byMinutes), 3), 12);
     const waypoints = [];
 
     for (let i = 0; i < numStops; i++) {
@@ -669,6 +679,38 @@ function showWeatherCards(weatherData) {
         card.addEventListener('click', () => { map.panTo({ lat: wp.lat, lng: wp.lon }); map.setZoom(10); });
         timelineCards.appendChild(card);
     });
+}
+
+function getManeuverIcon(maneuver, instructions) {
+    const text = (maneuver + ' ' + instructions).toLowerCase();
+    if (text.includes('uturn') || text.includes('u-turn')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M18 9v12h-2V9c0-2.21-1.79-4-4-4S8 6.79 8 9v4.17l1.59-1.59L11 13l-4 4-4-4 1.41-1.41L6 13.17V9c0-3.31 2.69-6 6-6s6 2.69 6 6z"/></svg>';
+    if (text.includes('sharp-left') || text.includes('sharp left')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M6 6.83L4.41 8.41 3 7l4-4 4 4-1.41 1.41L8 6.83V13h8c1.1 0 2 .9 2 2v6h-2v-6H8c-1.1 0-2-.9-2-2V6.83z"/></svg>';
+    if (text.includes('sharp-right') || text.includes('sharp right')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M18 6.83l-1.59 1.58L15 7l4-4 4 4-1.41 1.41L20 6.83V13h-8c-1.1 0-2 .9-2 2v6H8v-6c0-1.1-.9-2-2-2h8V6.83z"/></svg>';
+    if (text.includes('turn-left') || text.includes('turn left') || text.includes('left')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M14 7l-5 5 5 5V7zm7 10v2H3v-2h18z"/></svg>';
+    if (text.includes('turn-right') || text.includes('turn right') || text.includes('right')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M10 17l5-5-5-5v10zm-7 0v2h18v-2H3z"/></svg>';
+    if (text.includes('roundabout')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-13v2.17l-1.59-1.59L8 9l4 4 4-4-1.41-1.41L13 9.17V7h-2z"/></svg>';
+    if (text.includes('merge')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M17 4l-1.41 1.41L17.17 7H8c-2.76 0-5 2.24-5 5v5h2v-5c0-1.65 1.35-3 3-3h9.17l-1.58 1.59L17 12l4-4-4-4z"/></svg>';
+    if (text.includes('ramp') || text.includes('exit') || text.includes('off-ramp')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M18 6.83l1.59 1.58L21 7l-4-4-4 4 1.41 1.41L16 6.83V10c0 3.07-1.64 5.64-4 7.08V4h-2v13.08C7.64 15.64 6 13.07 6 10V6.83L7.59 8.41 9 7 5 3 1 7l1.41 1.41L4 6.83V10c0 3.72 2.01 6.94 5 8.72V21h6v-2.28c2.99-1.78 5-5 5-8.72V6.83z"/></svg>';
+    if (text.includes('fork')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M14 7l5 5-5 5V7zM3 17v2h18v-2H3zM10 7v10l-5-5 5-5z"/></svg>';
+    return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>';
+}
+
+function initTimelineDrag() {
+    const container = timelineCards;
+    let isDown = false, startX, scrollLeft;
+    container.addEventListener('mousedown', (e) => { isDown = true; container.classList.add('dragging'); startX = e.pageX - container.offsetLeft; scrollLeft = container.scrollLeft; });
+    container.addEventListener('mouseleave', () => { isDown = false; container.classList.remove('dragging'); });
+    container.addEventListener('mouseup', () => { isDown = false; container.classList.remove('dragging'); });
+    container.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - container.offsetLeft; container.scrollLeft = scrollLeft - (x - startX); });
+}
+
+function formatDuration(seconds) {
+    const totalMin = Math.round(seconds / 60);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h === 0) return `${m} min`;
+    if (m === 0) return `${h} hr`;
+    return `${h} hr ${m} min`;
 }
 
 function showError(msg) { errorMessage.textContent = msg; errorMessage.classList.remove('hidden'); }
