@@ -413,6 +413,44 @@ html, body {
     white-space: nowrap;
     pointer-events: none;
     display: inline-block;
+    position: relative;
+}
+
+.route-info-box::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+}
+
+.route-info-box.arrow-top::after {
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid white;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
+}
+
+.route-info-box.arrow-left::after {
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 6px solid white;
+    filter: drop-shadow(1px 0 1px rgba(0,0,0,0.2));
+}
+
+.route-info-box.arrow-right::after {
+    left: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 6px solid white;
+    filter: drop-shadow(-1px 0 1px rgba(0,0,0,0.2));
 }
 
 .route-info-box .rib-duration {
@@ -426,7 +464,7 @@ html, body {
     color: #5f6368;
 }
 
-.route-info-box.alt .rib-duration { color: #70757a; }
+.route-info-box.alt .rib-duration { color: #5f6368; }
 
 /* ===== BOTTOM WEATHER TIMELINE ===== */
 #weather-timeline {

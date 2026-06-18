@@ -60,10 +60,11 @@ function initApp() {
     };
 
     RouteInfoOverlay = class extends google.maps.OverlayView {
-        constructor(position, content, mapInstance) {
+        constructor(position, content, mapInstance, side) {
             super();
             this.position = position;
             this.content = content;
+            this.side = side || 'top';
             this.div = null;
             this.setMap(mapInstance);
         }
@@ -77,11 +78,18 @@ function initApp() {
         }
         draw() {
             const p = this.getProjection().fromLatLngToDivPixel(this.position);
-            if (p) {
-                const w = this.div.offsetWidth || 80;
-                const h = this.div.offsetHeight || 36;
+            if (!p) return;
+            const w = this.div.offsetWidth || 80;
+            const h = this.div.offsetHeight || 36;
+            if (this.side === 'left') {
+                this.div.style.left = (p.x - w - 14) + 'px';
+                this.div.style.top = (p.y - h / 2) + 'px';
+            } else if (this.side === 'right') {
+                this.div.style.left = (p.x + 14) + 'px';
+                this.div.style.top = (p.y - h / 2) + 'px';
+            } else {
                 this.div.style.left = (p.x - w / 2) + 'px';
-                this.div.style.top = (p.y - h - 12) + 'px';
+                this.div.style.top = (p.y - h - 14) + 'px';
             }
         }
         onRemove() { if (this.div) { this.div.parentNode.removeChild(this.div); this.div = null; } }
@@ -295,21 +303,36 @@ function displayRoutes(directionsResult, routeData, departureTime) {
                 suppressMarkers: !isSelected,
                 preserveViewport: true,
                 polylineOptions: {
-                    strokeColor: isSelected ? '#4285F4' : '#BDC1C6',
+                    strokeColor: isSelected ? '#4285F4' : '#8AB4F8',
                     strokeWeight: isSelected ? 5 : 4,
-                    strokeOpacity: isSelected ? 1.0 : 0.6,
+                    strokeOpacity: isSelected ? 1.0 : 0.7,
                     zIndex: isSelected ? 10 : 1,
                 }
             });
             directionsRenderers.push(renderer);
 
             const path = route.overview_path;
-            const labelIdx = Math.floor(path.length * (0.3 + i * 0.2));
-            const labelPoint = path[Math.min(labelIdx, path.length - 1)];
+            const labelFraction = 0.3 + i * 0.2;
+            const labelIdx = Math.min(Math.floor(path.length * labelFraction), path.length - 1);
+            const labelPoint = path[labelIdx];
+
+            const nearIdx = Math.min(labelIdx + 1, path.length - 1);
+            const dx = path[nearIdx].lng() - path[labelIdx].lng();
+            const dy = path[nearIdx].lat() - path[labelIdx].lat();
+            let side;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                side = dy >= 0 ? 'top' : 'top';
+            } else {
+                side = dx >= 0 ? 'left' : 'right';
+            }
+            if (i === 1) side = 'right';
+            if (i === 2) side = 'left';
+
             const duration = leg.duration_in_traffic || leg.duration;
             const distMiles = Math.round(leg.distance.value / 1609.34);
-            const infoHtml = `<div class="route-info-box ${isSelected ? '' : 'alt'}"><div class="rib-duration">${duration.text}</div><div class="rib-distance">${distMiles} miles</div></div>`;
-            const infoOverlay = new RouteInfoOverlay(labelPoint, infoHtml, map);
+            const arrowClass = `arrow-${side}`;
+            const infoHtml = `<div class="route-info-box ${isSelected ? '' : 'alt'} ${arrowClass}"><div class="rib-duration">${duration.text}</div><div class="rib-distance">${distMiles} miles</div></div>`;
+            const infoOverlay = new RouteInfoOverlay(labelPoint, infoHtml, map, side);
             routeInfoOverlays.push(infoOverlay);
         });
 
@@ -424,8 +447,14 @@ function sampleWaypoints(directionsResult, routeIndex, departureTime) {
     const leg = route.legs[0];
     const totalDuration = (leg.duration_in_traffic || leg.duration).value;
     const totalDistance = leg.distance.value;
+    const totalMiles = totalDistance / 1609.34;
     const path = route.overview_path;
-    const numStops = Math.min(Math.max(Math.ceil(totalDuration / 3600), 3), 12);
+
+    let interval = 30;
+    if (totalMiles > 500) interval = 50;
+    else if (totalMiles > 300) interval = 40;
+
+    const numStops = Math.min(Math.max(Math.ceil(totalMiles / interval) + 1, 3), 20);
     const waypoints = [];
 
     for (let i = 0; i < numStops; i++) {
