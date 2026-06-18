@@ -9,42 +9,45 @@
 <body>
     <div id="side-panel">
         <div id="search-section">
-            <div class="panel-header">
-                <span class="panel-title">Weather on the Road</span>
-            </div>
             <div class="search-inputs">
                 <div class="search-input-row">
-                    <span class="search-dot origin-dot"></span>
-                    <input type="text" id="origin" placeholder="Choose starting point..." autocomplete="off" />
-                </div>
-                <div class="search-input-row">
-                    <span class="search-dot dest-dot"></span>
-                    <input type="text" id="destination" placeholder="Choose destination..." autocomplete="off" />
-                </div>
-                <div class="datetime-row">
-                    <input type="date" id="departure-date" />
-                    <input type="time" id="departure-time" value="08:00" />
-                    <button id="plan-trip">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    <div class="input-dot-wrap"><span class="dot origin-dot"></span></div>
+                    <input type="text" id="origin" placeholder="Your location" autocomplete="off" />
+                    <button id="my-location-btn" title="Use my location">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#5f6368"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
                     </button>
                 </div>
-                <label class="toggle-label">
-                    <input type="checkbox" id="toggle-overlays" checked />
-                    Show weather on map
-                </label>
+                <div class="search-input-row">
+                    <div class="input-dot-wrap"><span class="dot dest-dot"></span><span class="dot-line"></span></div>
+                    <input type="text" id="destination" placeholder="Choose destination..." autocomplete="off" />
+                </div>
             </div>
+            <div class="search-options-row">
+                <div class="datetime-inputs">
+                    <input type="date" id="departure-date" />
+                    <input type="time" id="departure-time" value="08:00" />
+                </div>
+                <button id="plan-trip">Search</button>
+            </div>
+            <label class="toggle-label">
+                <input type="checkbox" id="toggle-overlays" checked />
+                Show weather icons on map
+            </label>
         </div>
-        <div id="directions-panel"></div>
-        <div id="weather-info-panel" class="hidden">
-            <div id="weather-bars-section"></div>
+
+        <div id="routes-section" class="hidden">
+            <div id="routes-list"></div>
         </div>
+
         <div id="error-message" class="error hidden"></div>
     </div>
 
     <div id="map"></div>
 
     <div id="weather-timeline" class="hidden">
-        <h2>Weather Along Your Route</h2>
+        <div id="timeline-header">
+            <h2>Weather Along Your Route</h2>
+        </div>
         <div id="timeline-cards"></div>
     </div>
 
