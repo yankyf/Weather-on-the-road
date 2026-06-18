@@ -338,7 +338,7 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             directionsRenderers.push(renderer);
 
             const path = route.overview_path;
-            const duration = leg.duration_in_traffic || leg.duration;
+            const durationSec = (leg.duration_in_traffic || leg.duration).value;
             const distMiles = Math.round(leg.distance.value / 1609.34);
 
             let labelPoint, side;
@@ -370,8 +370,6 @@ function displayRoutes(directionsResult, routeData, departureTime) {
                 }
             }
 
-            const durationSec = (leg.duration_in_traffic || leg.duration).value;
-            const distMiles = Math.round(leg.distance.value / 1609.34);
             const arrowClass = `arrow-${side}`;
             const infoHtml = `<div class="route-info-box ${isSelected ? '' : 'alt'} ${arrowClass}"><div class="rib-duration">${formatDuration(durationSec)}</div><div class="rib-distance">${distMiles} miles</div></div>`;
             const infoOverlay = new RouteInfoOverlay(labelPoint, infoHtml, map, side);
