@@ -12,39 +12,55 @@ body {
 }
 
 #app {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 16px;
 }
 
-#map-row {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-}
-
 header {
     text-align: center;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 header h1 {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     color: #2b6cb0;
 }
 
-/* Map and search panel */
-#map-container {
-    flex: 1;
-    min-width: 0;
+/* Layout: side panel + map */
+#map-row {
+    display: flex;
+    gap: 0;
+    align-items: stretch;
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
+#side-panel {
+    flex-shrink: 0;
+    width: 360px;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    max-height: 600px;
+    overflow-y: auto;
+    border-right: 1px solid #e2e8f0;
+}
+
+#search-panel {
+    padding: 14px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+#map-container {
+    flex: 1;
+    min-width: 0;
+}
+
 #map {
     width: 100%;
-    height: 550px;
+    height: 600px;
 }
 
 #recenter-map {
@@ -64,31 +80,7 @@ header h1 {
     background: #f7fafc;
 }
 
-#search-panel {
-    flex-shrink: 0;
-    width: 280px;
-    background: white;
-    border-radius: 10px;
-    padding: 14px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-}
-
-.toggle-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.85rem;
-    color: #4a5568;
-    margin-bottom: 10px;
-    cursor: pointer;
-}
-
-.toggle-label input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
+/* Search fields */
 .search-field {
     margin-bottom: 10px;
 }
@@ -108,7 +100,7 @@ header h1 {
     padding: 8px 10px;
     border: 1.5px solid #e2e8f0;
     border-radius: 6px;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
 }
 
 .search-field input:focus {
@@ -132,26 +124,66 @@ header h1 {
     padding: 8px 6px;
 }
 
+.search-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8rem;
+    color: #4a5568;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
 #plan-trip {
-    width: 100%;
-    padding: 10px;
-    background: #3182ce;
+    flex: 1;
+    padding: 9px 16px;
+    background: #4285F4;
     color: white;
     border: none;
     border-radius: 6px;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s;
 }
 
 #plan-trip:hover {
-    background: #2b6cb0;
+    background: #3367D6;
 }
 
 #plan-trip:disabled {
     background: #a0aec0;
     cursor: not-allowed;
+}
+
+/* Google Directions Panel styling */
+#directions-panel {
+    font-size: 0.85rem;
+}
+
+/* Weather info below directions */
+#weather-info-panel {
+    padding: 12px 14px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.weather-summary-title {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #2d3748;
+    margin-bottom: 8px;
 }
 
 /* Minimal weather overlays on the map */
@@ -245,7 +277,7 @@ header h1 {
     padding: 14px;
     background: #f7fafc;
     border-radius: 10px;
-    border-left: 4px solid #4299e1;
+    border-left: 4px solid #4285F4;
 }
 
 .weather-card .time-info {
@@ -302,90 +334,14 @@ header h1 {
 
 .loading {
     text-align: center;
-    padding: 40px;
+    padding: 30px;
     color: #718096;
-    font-size: 1.1rem;
+    font-size: 0.95rem;
 }
 
-/* Route picker */
-.route-picker {
-    margin-bottom: 16px;
-}
-
-.route-picker h3 {
-    font-size: 1rem;
-    color: #2d3748;
-    margin-bottom: 10px;
-}
-
-.route-option {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-    text-align: left;
-    padding: 14px 16px;
-    margin-bottom: 8px;
-    background: #f7fafc;
-    border: 2px solid #e2e8f0;
-    border-radius: 10px;
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    position: relative;
-}
-
-.route-option:hover {
-    background: #ebf8ff;
-    border-color: #90cdf4;
-    box-shadow: 0 2px 8px rgba(49, 130, 206, 0.12);
-}
-
-.route-option.selected {
-    background: #ebf8ff;
-    border-color: #3182ce;
-    box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.2), 0 2px 8px rgba(49, 130, 206, 0.15);
-}
-
-.route-number {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.85rem;
-    color: white;
-    background: #4285F4;
-}
-
-.route-option.selected .route-number {
-    transform: scale(1.1);
-}
-
-.route-option-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.route-option-top {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.route-option-details {
-    font-size: 0.8rem;
-    color: #718096;
-    margin-top: 4px;
-}
-
+/* Weather and traffic bars */
 .route-bars {
-    margin-top: 8px;
+    margin-top: 4px;
 }
 
 .bar-row {
@@ -461,68 +417,18 @@ header h1 {
     color: #4a5568;
 }
 
-.route-check {
-    flex-shrink: 0;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid #cbd5e0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-}
-
-.route-option.selected .route-check {
-    background: #3182ce;
-    border-color: #3182ce;
-}
-
-.route-check svg {
-    width: 12px;
-    height: 12px;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.route-option.selected .route-check svg {
-    opacity: 1;
-}
-
-.weather-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    font-weight: 600;
-}
-
-.weather-badge.good {
-    background: #c6f6d5;
-    color: #22543d;
-}
-
-.weather-badge.bad {
-    background: #fed7d7;
-    color: #9b2c2c;
-}
-
-.weather-badge.warn {
-    background: #fefcbf;
-    color: #744210;
-}
-
-@media (max-width: 700px) {
+@media (max-width: 768px) {
     #map-row {
         flex-direction: column;
     }
 
-    #search-panel {
+    #side-panel {
         width: 100%;
+        max-height: none;
     }
 
     #map {
-        height: 450px;
+        height: 400px;
     }
 
     .weather-card {

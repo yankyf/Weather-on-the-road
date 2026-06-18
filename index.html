@@ -14,30 +14,38 @@
 
         <div id="main-content">
             <div id="map-row">
-                <div id="search-panel">
-                    <div class="search-field">
-                        <label>From</label>
-                        <input type="text" id="origin" placeholder="Search starting point..." autocomplete="off" />
-                    </div>
-                    <div class="search-field">
-                        <label>To</label>
-                        <input type="text" id="destination" placeholder="Search destination..." autocomplete="off" />
-                    </div>
-                    <div class="search-row">
-                        <div class="search-field small">
-                            <label>Date</label>
-                            <input type="date" id="departure-date" />
+                <div id="side-panel">
+                    <div id="search-panel">
+                        <div class="search-field">
+                            <label>From</label>
+                            <input type="text" id="origin" placeholder="Search starting point..." autocomplete="off" />
                         </div>
-                        <div class="search-field small">
-                            <label>Time</label>
-                            <input type="time" id="departure-time" value="08:00" />
+                        <div class="search-field">
+                            <label>To</label>
+                            <input type="text" id="destination" placeholder="Search destination..." autocomplete="off" />
+                        </div>
+                        <div class="search-row">
+                            <div class="search-field small">
+                                <label>Date</label>
+                                <input type="date" id="departure-date" />
+                            </div>
+                            <div class="search-field small">
+                                <label>Time</label>
+                                <input type="time" id="departure-time" value="08:00" />
+                            </div>
+                        </div>
+                        <div class="search-actions">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="toggle-overlays" checked />
+                                Weather icons
+                            </label>
+                            <button id="plan-trip">Go</button>
                         </div>
                     </div>
-                    <label class="toggle-label">
-                        <input type="checkbox" id="toggle-overlays" checked />
-                        Show weather icons on map
-                    </label>
-                    <button id="plan-trip">Go</button>
+                    <div id="directions-panel"></div>
+                    <div id="weather-info-panel" class="hidden">
+                        <div id="weather-bars-section"></div>
+                    </div>
                 </div>
                 <div id="map-container">
                     <div id="map"></div>

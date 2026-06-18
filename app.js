@@ -4,18 +4,22 @@ const departureDateInput = document.getElementById('departure-date');
 const departureTimeInput = document.getElementById('departure-time');
 const planButton = document.getElementById('plan-trip');
 const errorMessage = document.getElementById('error-message');
-const mainContent = document.getElementById('main-content');
 const weatherTimeline = document.getElementById('weather-timeline');
 const timelineCards = document.getElementById('timeline-cards');
+const directionsPanel = document.getElementById('directions-panel');
+const weatherInfoPanel = document.getElementById('weather-info-panel');
+const weatherBarsSection = document.getElementById('weather-bars-section');
 
 let map = null;
-let directionsRenderers = [];
+let directionsRenderer = null;
 let weatherOverlays = [];
 let WeatherOverlay = null;
-let allRoutes = null;
 let lastRouteBounds = null;
 let showOverlaysFlag = true;
 let currentWeatherData = null;
+let cachedRouteWeather = null;
+let cachedDirectionsResult = null;
+let cachedDepartureTime = null;
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -77,6 +81,22 @@ function initApp() {
             zoomControlOptions: {
                 position: google.maps.ControlPosition.RIGHT_CENTER
             }
+        });
+
+        directionsRenderer = new google.maps.DirectionsRenderer({
+            map,
+            panel: directionsPanel,
+            suppressMarkers: false,
+            polylineOptions: {
+                strokeColor: '#4285F4',
+                strokeWeight: 5,
+                strokeOpacity: 0.8,
+            }
+        });
+
+        directionsRenderer.addListener('routeindex_changed', () => {
+            const idx = directionsRenderer.getRouteIndex();
+            onRouteChanged(idx);
         });
 
         const recenterBtn = document.createElement('button');
@@ -141,8 +161,6 @@ window.initApp = initApp;
 function clearMap() {
     weatherOverlays.forEach(o => o.setMap(null));
     weatherOverlays = [];
-    directionsRenderers.forEach(r => r.setMap(null));
-    directionsRenderers = [];
 }
 
 async function planTrip() {
@@ -153,34 +171,85 @@ async function planTrip() {
 
     planButton.disabled = true;
     planButton.textContent = 'Loading...';
+    directionsPanel.innerHTML = '<div class="loading">Calculating routes...</div>';
+    weatherInfoPanel.classList.add('hidden');
     weatherTimeline.classList.remove('hidden');
-    timelineCards.innerHTML = '<div class="loading">Calculating routes and fetching weather...</div>';
+    timelineCards.innerHTML = '<div class="loading">Fetching weather data...</div>';
 
     try {
         const result = await getRoute(originInput.value, destinationInput.value);
-        allRoutes = result;
-        const departureDateTime = new Date(`${departureDateInput.value}T${departureTimeInput.value}:00`);
+        cachedDirectionsResult = result;
+        cachedDepartureTime = new Date(`${departureDateInput.value}T${departureTimeInput.value}:00`);
 
-        const routeWeatherData = [];
+        directionsRenderer.setDirections(result);
+        directionsRenderer.setRouteIndex(0);
+
+        cachedRouteWeather = {};
         for (let r = 0; r < result.routes.length; r++) {
-            const waypoints = sampleWaypoints(result, r, departureDateTime);
+            const waypoints = sampleWaypoints(result, r, cachedDepartureTime);
             const weatherData = await getWeatherForWaypoints(waypoints);
             const withForecast = weatherData.filter(w => !w.noForecast);
             const maxRain = withForecast.length ? Math.max(...withForecast.map(w => w.precipitationProb)) : 0;
             const badWeatherCount = withForecast.filter(w => [55, 61, 63, 65, 66, 67, 71, 73, 75, 80, 81, 82, 85, 86, 95, 96, 99].includes(w.weatherCode)).length;
             const alerts = getWeatherAlerts(weatherData);
-            routeWeatherData.push({ routeIndex: r, weatherData, maxRain, badWeatherCount, alerts });
+            cachedRouteWeather[r] = { weatherData, maxRain, badWeatherCount, alerts };
         }
 
-        routeWeatherData.sort((a, b) => a.badWeatherCount - b.badWeatherCount || a.maxRain - b.maxRain);
-        displayRouteOptions(result, routeWeatherData, departureDateTime);
+        onRouteChanged(0);
+
     } catch (err) {
         showError('Something went wrong: ' + err.message);
         weatherTimeline.classList.add('hidden');
+        directionsPanel.innerHTML = '';
     } finally {
         planButton.disabled = false;
         planButton.textContent = 'Go';
     }
+}
+
+function onRouteChanged(routeIndex) {
+    if (!cachedRouteWeather || !cachedRouteWeather[routeIndex]) return;
+
+    const rd = cachedRouteWeather[routeIndex];
+    const route = cachedDirectionsResult.routes[routeIndex];
+
+    currentWeatherData = rd.weatherData;
+    showWeatherBars(route, rd);
+    showWeatherCards(rd.weatherData);
+    if (showOverlaysFlag) showOverlaysOnMap(rd.weatherData);
+
+    const bounds = new google.maps.LatLngBounds();
+    route.overview_path.forEach(p => bounds.extend(p));
+    lastRouteBounds = bounds;
+}
+
+function showWeatherBars(route, rd) {
+    weatherInfoPanel.classList.remove('hidden');
+
+    const { barHtml, legendHtml } = buildWeatherBar(rd.weatherData);
+    const traffic = getStepTrafficSegments(route);
+    const trafficBarHtml = traffic.segments.map(s => `<div style="flex:${s.pct};background:${s.color};height:100%;"></div>`).join('');
+
+    let alertsHtml = '';
+    if (rd.alerts.length > 0) {
+        const alertItems = rd.alerts.map(a => {
+            let cls = 'alert-caution';
+            if (a.type === 'danger') cls = 'alert-danger';
+            else if (a.type === 'warning') cls = 'alert-warning';
+            return `<div class="route-alert ${cls}">${a.icon} ${a.text}</div>`;
+        }).join('');
+        alertsHtml = `<div class="route-alerts">${alertItems}</div>`;
+    }
+
+    weatherBarsSection.innerHTML = `
+        <div class="weather-summary-title">Weather & Traffic</div>
+        <div class="route-bars">
+            <div class="bar-row"><span class="bar-label">Weather</span><div class="weather-bar-container"><div class="weather-bar">${barHtml}</div></div></div>
+            <div class="weather-bar-legend">${legendHtml}</div>
+            <div class="bar-row" style="margin-top:6px"><span class="bar-label">Traffic</span><div class="weather-bar-container"><div class="weather-bar">${trafficBarHtml}</div></div><span class="traffic-text" style="color:${traffic.labelColor}">${traffic.label}</span></div>
+        </div>
+        ${alertsHtml}
+    `;
 }
 
 function getWeatherAlerts(weatherData) {
@@ -391,114 +460,6 @@ function getStepTrafficSegments(route) {
     return { segments: merged, label, labelColor, delayMin };
 }
 
-function renderRoutes(directionsResult, routeWeatherData, selectedIdx) {
-    directionsRenderers.forEach(r => r.setMap(null));
-    directionsRenderers = [];
-
-    routeWeatherData.forEach((rd, ri) => {
-        const isSelected = ri === selectedIdx;
-        const renderer = new google.maps.DirectionsRenderer({
-            map,
-            directions: directionsResult,
-            routeIndex: rd.routeIndex,
-            suppressMarkers: false,
-            preserveViewport: true,
-            polylineOptions: {
-                strokeColor: isSelected ? '#4285F4' : '#8AB4F8',
-                strokeWeight: isSelected ? 6 : 4,
-                strokeOpacity: isSelected ? 1.0 : 0.45,
-                zIndex: isSelected ? 10 : 1,
-            }
-        });
-        directionsRenderers.push(renderer);
-    });
-}
-
-function displayRouteOptions(directionsResult, routeWeatherData) {
-    clearMap();
-    timelineCards.innerHTML = '';
-    weatherTimeline.classList.remove('hidden');
-
-    if (routeWeatherData.length > 1) {
-        const routePicker = document.createElement('div');
-        routePicker.className = 'route-picker';
-        routePicker.innerHTML = '<h3>Choose a Route</h3>';
-
-        routeWeatherData.forEach((rd, idx) => {
-            const route = directionsResult.routes[rd.routeIndex];
-            const leg = route.legs[0];
-            const duration = leg.duration_in_traffic || leg.duration;
-            const durationMin = Math.round(duration.value / 60);
-            const hours = Math.floor(durationMin / 60);
-            const mins = durationMin % 60;
-            const distMiles = (leg.distance.value / 1609.34).toFixed(0);
-            const summary = route.summary || `Route ${idx + 1}`;
-            const isBest = idx === 0;
-
-            let weatherLabel = '';
-            if (rd.badWeatherCount === 0 && rd.maxRain <= 20) weatherLabel = '<span class="weather-badge good">Best Weather</span>';
-            else if (rd.badWeatherCount > 0) weatherLabel = `<span class="weather-badge bad">${rd.badWeatherCount} bad stretch${rd.badWeatherCount > 1 ? 'es' : ''}</span>`;
-            else if (rd.maxRain > 50) weatherLabel = `<span class="weather-badge warn">Up to ${rd.maxRain}% rain chance</span>`;
-
-            const { barHtml, legendHtml } = buildWeatherBar(rd.weatherData);
-            const traffic = getStepTrafficSegments(route);
-            const trafficBarHtml = traffic.segments.map(s => `<div style="flex:${s.pct};background:${s.color};height:100%;"></div>`).join('');
-
-            let alertsHtml = '';
-            if (rd.alerts.length > 0) {
-                const alertItems = rd.alerts.map(a => {
-                    let cls = 'alert-caution';
-                    if (a.type === 'danger') cls = 'alert-danger';
-                    else if (a.type === 'warning') cls = 'alert-warning';
-                    return `<div class="route-alert ${cls}">${a.icon} ${a.text}</div>`;
-                }).join('');
-                alertsHtml = `<div class="route-alerts">${alertItems}</div>`;
-            }
-
-            const btn = document.createElement('button');
-            btn.className = `route-option ${isBest ? 'selected' : ''}`;
-            btn.innerHTML = `
-                <div class="route-number">${idx + 1}</div>
-                <div class="route-option-content">
-                    <div class="route-option-top">
-                        <strong>via ${summary}</strong>
-                        ${weatherLabel}
-                    </div>
-                    <div class="route-option-details">${hours > 0 ? hours + 'h ' : ''}${mins}min · ${distMiles} mi</div>
-                    <div class="route-bars">
-                        <div class="bar-row"><span class="bar-label">Weather</span><div class="weather-bar-container"><div class="weather-bar">${barHtml}</div></div></div>
-                        <div class="weather-bar-legend">${legendHtml}</div>
-                        <div class="bar-row"><span class="bar-label">Traffic</span><div class="weather-bar-container"><div class="weather-bar">${trafficBarHtml}</div></div><span class="traffic-text" style="color:${traffic.labelColor}">${traffic.label}</span></div>
-                    </div>
-                    ${alertsHtml}
-                </div>
-                <div class="route-check"><svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-            `;
-
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.route-option').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-                renderRoutes(directionsResult, routeWeatherData, idx);
-                currentWeatherData = rd.weatherData;
-                showWeatherCards(rd.weatherData);
-                if (showOverlaysFlag) showOverlaysOnMap(rd.weatherData);
-            });
-            routePicker.appendChild(btn);
-        });
-        timelineCards.appendChild(routePicker);
-    }
-
-    renderRoutes(directionsResult, routeWeatherData, 0);
-    currentWeatherData = routeWeatherData[0].weatherData;
-    showWeatherCards(routeWeatherData[0].weatherData);
-    if (showOverlaysFlag) showOverlaysOnMap(routeWeatherData[0].weatherData);
-
-    const bounds = new google.maps.LatLngBounds();
-    directionsResult.routes[routeWeatherData[0].routeIndex].overview_path.forEach(p => bounds.extend(p));
-    lastRouteBounds = bounds;
-    map.fitBounds(bounds, { top: 20, left: 20, right: 40, bottom: 40 });
-}
-
 function showOverlaysOnMap(weatherData) {
     weatherOverlays.forEach(o => o.setMap(null));
     weatherOverlays = [];
@@ -524,9 +485,8 @@ function showOverlaysOnMap(weatherData) {
 }
 
 function showWeatherCards(weatherData) {
-    let cardsContainer = document.getElementById('weather-cards-list');
-    if (cardsContainer) cardsContainer.innerHTML = '';
-    else { cardsContainer = document.createElement('div'); cardsContainer.id = 'weather-cards-list'; timelineCards.appendChild(cardsContainer); }
+    weatherTimeline.classList.remove('hidden');
+    timelineCards.innerHTML = '';
 
     weatherData.forEach((wp) => {
         const info = wp.noForecast ? { icon: '—', desc: 'No forecast available' } : weatherCodeToInfo(wp.weatherCode);
@@ -547,7 +507,7 @@ function showWeatherCards(weatherData) {
             map.panTo({ lat: wp.lat, lng: wp.lon });
             map.setZoom(10);
         });
-        cardsContainer.appendChild(card);
+        timelineCards.appendChild(card);
     });
 }
 
