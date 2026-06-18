@@ -4,55 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weather on the Road</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
     <div id="side-panel">
+        <div id="panel-header">
+            <div class="brand">
+                <span class="brand-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a73e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                </span>
+                <span class="brand-text">Weather on the Road</span>
+            </div>
+        </div>
+
         <div id="search-section">
-            <div class="search-inputs">
-                <div class="search-input-row">
-                    <div class="input-dot-wrap"><span class="dot origin-dot"></span></div>
-                    <input type="text" id="origin" placeholder="Your location (or click map)" autocomplete="off" />
-                    <button id="my-location-btn" title="Use my location">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#5f6368"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+            <div class="search-card">
+                <div class="search-inputs">
+                    <div class="search-input-row">
+                        <div class="input-dot-wrap"><span class="dot origin-dot"></span></div>
+                        <input type="text" id="origin" placeholder="Starting point or click on map" autocomplete="off" />
+                        <button id="my-location-btn" title="Use my location">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+                        </button>
+                        <button id="swap-btn" title="Swap origin and destination">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
+                        </button>
+                    </div>
+                    <div class="search-input-row">
+                        <div class="input-dot-wrap"><span class="dot dest-dot"></span><span class="dot-line"></span></div>
+                        <input type="text" id="destination" placeholder="Destination or click on map" autocomplete="off" />
+                    </div>
+                    <div id="waypoints-container"></div>
+                    <button id="add-waypoint-btn" class="add-waypoint-btn">+ Add stop</button>
+                </div>
+
+                <div class="search-options-row">
+                    <div class="datetime-inputs">
+                        <input type="date" id="departure-date" />
+                        <input type="time" id="departure-time" value="08:00" />
+                    </div>
+                    <button id="plan-trip">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        Search
                     </button>
-                    <button id="swap-btn" title="Swap origin and destination">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#5f6368"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
-                    </button>
                 </div>
-                <div class="search-input-row">
-                    <div class="input-dot-wrap"><span class="dot dest-dot"></span><span class="dot-line"></span></div>
-                    <input type="text" id="destination" placeholder="Destination (or click map)" autocomplete="off" />
-                </div>
-                <div id="waypoints-container"></div>
-                <button id="add-waypoint-btn" class="add-waypoint-btn">+ Add stop</button>
-            </div>
-            <div class="search-options-row">
-                <div class="datetime-inputs">
-                    <input type="date" id="departure-date" />
-                    <input type="time" id="departure-time" value="08:00" />
-                </div>
-                <button id="plan-trip">Search</button>
-            </div>
-            <div class="search-toggles">
-                <label class="toggle-label">
-                    <input type="checkbox" id="toggle-overlays" checked />
-                    Weather icons on map
-                </label>
-                <label class="toggle-label">
-                    <input type="checkbox" id="toggle-radar" />
-                    Radar layer
-                </label>
-            </div>
-            <div class="departure-slider-section">
-                <label>
-                    🕐 Best departure
+
+                <div class="departure-slider-row">
+                    <span class="slider-label">Depart at</span>
                     <input type="range" id="departure-slider" min="0" max="23" step="1" value="8" />
                     <span id="slider-time-label">8:00 AM</span>
+                </div>
+            </div>
+
+            <div class="search-toggles">
+                <label class="toggle-pill">
+                    <input type="checkbox" id="toggle-overlays" checked />
+                    <span class="pill-text">Weather icons</span>
+                </label>
+                <label class="toggle-pill">
+                    <input type="checkbox" id="toggle-radar" />
+                    <span class="pill-text">Radar</span>
                 </label>
             </div>
+
             <div id="recent-searches" class="hidden">
-                <div class="recent-header">Recent searches</div>
+                <div class="recent-header">Recent</div>
                 <div id="recent-list"></div>
             </div>
         </div>
@@ -73,10 +92,10 @@
             <h2>Weather Along Your Route</h2>
             <div id="timeline-actions">
                 <button id="share-trip-btn" class="timeline-btn" title="Share trip">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#5f6368"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
                 </button>
                 <button id="print-trip-btn" class="timeline-btn" title="Print trip summary">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#5f6368"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
                 </button>
             </div>
         </div>
