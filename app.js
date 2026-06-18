@@ -20,6 +20,12 @@ const shareTripBtn = document.getElementById('share-trip-btn');
 const printTripBtn = document.getElementById('print-trip-btn');
 const departureSlider = document.getElementById('departure-slider');
 const sliderTimeLabel = document.getElementById('slider-time-label');
+const goNowBtn = document.getElementById('go-now-btn');
+const pickTimeBtn = document.getElementById('pick-time-btn');
+const pickTimeSection = document.getElementById('pick-time-section');
+const tripActions = document.getElementById('trip-actions');
+const bestTimeBtn = document.getElementById('best-time-btn');
+const bestTimeResult = document.getElementById('best-time-result');
 
 let map = null;
 let directionsRenderers = [];
@@ -29,7 +35,6 @@ let radarLayer = null;
 let WeatherOverlay = null;
 let RouteInfoOverlay = null;
 let lastRouteBounds = null;
-let showOverlaysFlag = true;
 let currentWeatherData = null;
 let currentRouteData = null;
 let currentDirectionsResult = null;
@@ -37,6 +42,7 @@ let mapClickMode = null;
 let pickMarker = null;
 let myLocationMarker = null;
 let waypointInputs = [];
+let useGoNow = true;
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -146,7 +152,7 @@ function initApp() {
                 if (myLocationMarker) myLocationMarker.setMap(null);
                 myLocationMarker = new google.maps.Marker({
                     position: latlng, map,
-                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#4285F4', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 },
+                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 },
                     title: 'Your location', zIndex: 999
                 });
                 new google.maps.Geocoder().geocode({ location: latlng }, (results, status) => {
@@ -169,7 +175,7 @@ function initApp() {
             if (pickMarker) pickMarker.setMap(null);
             pickMarker = new google.maps.Marker({
                 position: latlng, map,
-                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#ffffff', fillOpacity: 1, strokeColor: mapClickMode === 'origin' ? '#5f6368' : '#4285f4', strokeWeight: 3 },
+                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#ffffff', fillOpacity: 1, strokeColor: mapClickMode === 'origin' ? '#64748b' : '#3b82f6', strokeWeight: 3 },
                 animation: google.maps.Animation.DROP
             });
             let targetInput;
@@ -198,32 +204,30 @@ function initApp() {
             planTrip();
         });
 
-        document.getElementById('toggle-overlays').addEventListener('change', (e) => {
-            showOverlaysFlag = e.target.checked;
-            if (showOverlaysFlag && currentWeatherData) showOverlaysOnMap(currentWeatherData);
-            else { weatherOverlays.forEach(o => o.setMap(null)); weatherOverlays = []; }
+        // Go now / Pick a time toggle
+        goNowBtn.addEventListener('click', () => {
+            useGoNow = true;
+            goNowBtn.classList.add('active');
+            pickTimeBtn.classList.remove('active');
+            pickTimeSection.classList.add('hidden');
+        });
+        pickTimeBtn.addEventListener('click', () => {
+            useGoNow = false;
+            pickTimeBtn.classList.add('active');
+            goNowBtn.classList.remove('active');
+            pickTimeSection.classList.remove('hidden');
         });
 
+        // Radar toggle
         document.getElementById('toggle-radar').addEventListener('change', (e) => {
-            if (e.target.checked) {
-                radarLayer = new google.maps.ImageMapType({
-                    getTileUrl: (coord, zoom) => `https://tilecache.rainviewer.com/v2/radar/nowcast/256/${zoom}/${coord.x}/${coord.y}/6/1_1.png`,
-                    tileSize: new google.maps.Size(256, 256),
-                    opacity: 0.5,
-                    name: 'Radar'
-                });
-                map.overlayMapTypes.push(radarLayer);
-            } else {
-                for (let i = map.overlayMapTypes.getLength() - 1; i >= 0; i--) {
-                    if (map.overlayMapTypes.getAt(i) === radarLayer) map.overlayMapTypes.removeAt(i);
-                }
-                radarLayer = null;
-            }
+            if (e.target.checked) enableRadar();
+            else disableRadar();
         });
 
         addWaypointBtn.addEventListener('click', addWaypoint);
         shareTripBtn.addEventListener('click', shareTrip);
         printTripBtn.addEventListener('click', printTrip);
+        bestTimeBtn.addEventListener('click', findBestDepartureTime);
 
         departureSlider.addEventListener('input', () => {
             const hour = parseInt(departureSlider.value);
@@ -242,6 +246,32 @@ function initApp() {
     }
 }
 window.initApp = initApp;
+
+function enableRadar() {
+    fetch('https://api.rainviewer.com/public/weather-maps.json')
+        .then(r => r.json())
+        .then(data => {
+            const latest = data.radar && data.radar.past && data.radar.past.length
+                ? data.radar.past[data.radar.past.length - 1] : null;
+            if (!latest) return;
+            radarLayer = new google.maps.ImageMapType({
+                getTileUrl: (coord, zoom) => `https://tilecache.rainviewer.com${latest.path}/256/${zoom}/${coord.x}/${coord.y}/6/1_1.png`,
+                tileSize: new google.maps.Size(256, 256),
+                opacity: 0.5,
+                name: 'Radar'
+            });
+            map.overlayMapTypes.push(radarLayer);
+        })
+        .catch(() => {});
+}
+
+function disableRadar() {
+    if (!radarLayer) return;
+    for (let i = map.overlayMapTypes.getLength() - 1; i >= 0; i--) {
+        if (map.overlayMapTypes.getAt(i) === radarLayer) map.overlayMapTypes.removeAt(i);
+    }
+    radarLayer = null;
+}
 
 function setPickMode(mode, inputEl) {
     mapClickMode = mode;
@@ -279,24 +309,29 @@ function clearMap() {
     directionsPanel.innerHTML = ''; directionsPanel.classList.add('hidden');
 }
 
+function getDepartureTime() {
+    if (useGoNow) return new Date();
+    return new Date(`${departureDateInput.value}T${departureTimeInput.value}:00`);
+}
+
 async function planTrip() {
     hideError();
     if (!originInput.value.trim()) { showError('Please enter a starting point.'); return; }
     if (!destinationInput.value.trim()) { showError('Please enter a destination.'); return; }
-    if (!departureDateInput.value) { showError('Please select a departure date.'); return; }
 
     saveRecentSearch(originInput.value, destinationInput.value);
 
     planButton.disabled = true;
-    planButton.textContent = 'Searching...';
+    planButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg> Searching...';
     routesSection.classList.remove('hidden');
     routesList.innerHTML = '<div class="loading">Finding routes...</div>';
     weatherTimeline.classList.add('hidden');
+    tripActions.classList.add('hidden');
 
     try {
         const waypoints = waypointInputs.filter(w => w.value.trim()).map(w => ({ location: w.value.trim(), stopover: true }));
         const result = await getRoute(originInput.value, destinationInput.value, waypoints);
-        const departureTime = new Date(`${departureDateInput.value}T${departureTimeInput.value}:00`);
+        const departureTime = getDepartureTime();
 
         routesList.innerHTML = '<div class="loading">Loading weather...</div>';
 
@@ -309,17 +344,17 @@ async function planTrip() {
         for (let r = 0; r < maxRoutes; r++) {
             const weatherData = allWeather[r];
             const withForecast = weatherData.filter(w => !w.noForecast);
-            const maxRain = withForecast.length ? Math.max(...withForecast.map(w => w.precipitationProb)) : 0;
             const badWeatherCount = withForecast.filter(w =>
                 [55, 61, 63, 65, 66, 67, 71, 73, 75, 80, 81, 82, 85, 86, 95, 96, 99].includes(w.weatherCode)
             ).length;
             const alerts = getWeatherAlerts(weatherData);
             const roadConditions = getRoadConditions(weatherData);
             const score = calcRouteScore(weatherData);
+            const safetyLabel = getSafetyLabel(score);
             const route = result.routes[r];
             const leg = route.legs[0];
             const duration = (leg.duration_in_traffic || leg.duration).value;
-            routeData.push({ routeIndex: r, weatherData, maxRain, badWeatherCount, alerts, roadConditions, score, duration });
+            routeData.push({ routeIndex: r, weatherData, badWeatherCount, alerts, roadConditions, score, safetyLabel, duration });
         }
 
         const fastestIdx = routeData.reduce((min, rd, i) => rd.duration < routeData[min].duration ? i : min, 0);
@@ -328,6 +363,7 @@ async function planTrip() {
 
         currentDirectionsResult = result;
         currentRouteData = routeData;
+        tripActions.classList.remove('hidden');
         displayRoutes(result, routeData, departureTime);
 
     } catch (err) {
@@ -335,7 +371,7 @@ async function planTrip() {
         routesList.innerHTML = '';
     } finally {
         planButton.disabled = false;
-        planButton.textContent = 'Search';
+        planButton.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg> Search';
     }
 }
 
@@ -360,6 +396,36 @@ function calcRouteScore(weatherData) {
     return Math.round((total / valid.length) * 10) / 10;
 }
 
+function getSafetyLabel(score) {
+    if (score >= 9) return { text: 'Very safe drive', cls: 'safety-great', icon: '🟢' };
+    if (score >= 7) return { text: 'Safe drive', cls: 'safety-good', icon: '🟡' };
+    if (score >= 5) return { text: 'Use caution', cls: 'safety-caution', icon: '🟠' };
+    return { text: 'Unsafe conditions', cls: 'safety-danger', icon: '🔴' };
+}
+
+function getDaylightInfo(weatherData) {
+    if (!weatherData.length) return '';
+    const start = weatherData[0].arrivalTime;
+    const end = weatherData[weatherData.length - 1].arrivalTime;
+    const totalMin = (end - start) / 60000;
+    if (totalMin <= 0) return '';
+    let darkMin = 0;
+    for (let i = 0; i < weatherData.length - 1; i++) {
+        const wp = weatherData[i];
+        const next = weatherData[i + 1];
+        const segMin = (next.arrivalTime - wp.arrivalTime) / 60000;
+        const h = wp.arrivalTime.getHours();
+        if (h < 6 || h >= 20) darkMin += segMin;
+        else if (h >= 19) darkMin += segMin * 0.5;
+        else if (h < 7) darkMin += segMin * 0.5;
+    }
+    const dayPct = Math.round(((totalMin - darkMin) / totalMin) * 100);
+    const darkPct = 100 - dayPct;
+    if (darkPct === 0) return '☀️ 100% daylight';
+    if (dayPct === 0) return '🌙 100% dark';
+    return `☀️ ${dayPct}% day · 🌙 ${darkPct}% dark`;
+}
+
 function getRoadConditions(weatherData) {
     const conditions = [];
     for (const wp of weatherData.filter(w => !w.noForecast)) {
@@ -372,7 +438,7 @@ function getRoadConditions(weatherData) {
         if (wp.weatherCode === 45 || wp.weatherCode === 48)
             conditions.push({ type: 'warning', icon: '🌫️', text: `Low visibility near ${wp.locationName}` });
         if (wp.windSpeed >= 40)
-            conditions.push({ type: 'warning', icon: '💨', text: `Dangerous crosswinds near ${wp.locationName}` });
+            conditions.push({ type: 'warning', icon: '💨', text: `Crosswinds near ${wp.locationName}` });
     }
     return conditions;
 }
@@ -394,7 +460,7 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             const renderer = new google.maps.DirectionsRenderer({
                 map, directions: directionsResult, routeIndex: rd.routeIndex,
                 suppressMarkers: !isSelected, preserveViewport: true,
-                polylineOptions: { strokeColor: isSelected ? '#4285F4' : '#8AB4F8', strokeWeight: isSelected ? 5 : 4, strokeOpacity: isSelected ? 1.0 : 0.7, zIndex: isSelected ? 10 : 1 }
+                polylineOptions: { strokeColor: isSelected ? '#3b82f6' : '#93c5fd', strokeWeight: isSelected ? 5 : 4, strokeOpacity: isSelected ? 1.0 : 0.7, zIndex: isSelected ? 10 : 1 }
             });
             directionsRenderers.push(renderer);
 
@@ -430,22 +496,22 @@ function displayRoutes(directionsResult, routeData, departureTime) {
         currentWeatherData = rd.weatherData;
         showWeatherCards(rd.weatherData);
         showWeatherChart(rd.weatherData);
-        if (showOverlaysFlag) showOverlaysOnMap(rd.weatherData);
-        showDirections(directionsResult, rd.routeIndex);
+        showOverlaysOnMap(rd.weatherData);
+        showDirections(directionsResult, rd.routeIndex, rd);
     }
 
     routeData.forEach((rd, idx) => {
         const route = directionsResult.routes[rd.routeIndex];
         const leg = route.legs[0];
         const durationText = formatDuration((leg.duration_in_traffic || leg.duration).value);
-        const baseDurationText = formatDuration(leg.duration.value);
         const distMiles = Math.round(leg.distance.value / 1609.34);
         const summary = route.summary || `Route ${idx + 1}`;
         const { barHtml: weatherBarHtml, iconsHtml: weatherIconsHtml } = buildWeatherBar(rd.weatherData);
         const traffic = getStepTrafficSegments(route);
         const trafficBarHtml = traffic.segments.map(s => `<div style="flex:${s.pct};background:${s.color};height:100%;"></div>`).join('');
+        const daylightInfo = getDaylightInfo(rd.weatherData);
 
-        let badgesHtml = `<span class="badge badge-score">Score: ${rd.score}/10</span>`;
+        let badgesHtml = `<span class="badge ${rd.safetyLabel.cls}">${rd.safetyLabel.icon} ${rd.safetyLabel.text}</span>`;
         if (rd.isFastest && routeData.length > 1) badgesHtml += '<span class="badge badge-fastest">Fastest</span>';
         if (rd.isBestWeather && routeData.length > 1) badgesHtml += '<span class="badge badge-best-weather">Best weather</span>';
         if (rd.badWeatherCount > 0) badgesHtml += `<span class="badge badge-bad-weather">${rd.badWeatherCount} bad stretch${rd.badWeatherCount > 1 ? 'es' : ''}</span>`;
@@ -453,13 +519,11 @@ function displayRoutes(directionsResult, routeData, departureTime) {
         let conditionsHtml = '';
         const allConditions = [...rd.roadConditions, ...rd.alerts];
         if (allConditions.length > 0) {
-            conditionsHtml = '<div class="route-alerts-compact">' + allConditions.slice(0, 4).map(a => {
+            conditionsHtml = '<div class="route-alerts-compact">' + allConditions.slice(0, 3).map(a => {
                 const cls = a.type === 'danger' ? 'danger' : a.type === 'warning' ? 'warning' : 'caution';
                 return `<div class="alert-inline ${cls}">${a.icon} ${a.text}</div>`;
             }).join('') + '</div>';
         }
-
-        const sunInfo = getSunriseSunset(rd.weatherData);
 
         const btn = document.createElement('button');
         btn.className = `route-option ${idx === 0 ? 'selected' : ''}`;
@@ -468,7 +532,7 @@ function displayRoutes(directionsResult, routeData, departureTime) {
                 <span class="route-name">via ${summary}</span>
                 <span class="route-duration">${durationText}</span>
             </div>
-            <div class="route-meta">${baseDurationText} without traffic · ${distMiles} miles${sunInfo ? ` · ${sunInfo}` : ''}</div>
+            <div class="route-meta">${distMiles} miles${daylightInfo ? ` · ${daylightInfo}` : ''}</div>
             <div class="route-badges">${badgesHtml}</div>
             <div class="route-bars-compact">
                 <div class="bar-row-compact weather-bar-row">
@@ -494,28 +558,10 @@ function displayRoutes(directionsResult, routeData, departureTime) {
     const bounds = new google.maps.LatLngBounds();
     directionsResult.routes.forEach(r => r.overview_path.forEach(p => bounds.extend(p)));
     lastRouteBounds = bounds;
-    map.fitBounds(bounds, { top: 20, left: 420, right: 40, bottom: 200 });
+    map.fitBounds(bounds, { top: 20, left: 420, right: 40, bottom: 220 });
 }
 
-function getSunriseSunset(weatherData) {
-    if (!weatherData.length) return '';
-    const start = weatherData[0].arrivalTime;
-    const end = weatherData[weatherData.length - 1].arrivalTime;
-    const startH = start.getHours();
-    const endH = end.getHours();
-    const parts = [];
-    if (startH < 6 || startH >= 20) parts.push('🌙 Starts in dark');
-    if (endH < 6 || endH >= 20) parts.push('🌙 Arrives in dark');
-    const drivingHours = (end - start) / 3600000;
-    if (drivingHours > 4) {
-        if (startH < 18 && endH >= 20) parts.push('🌅 Sunset during drive');
-        if (startH < 6 && endH >= 6) parts.push('🌄 Sunrise during drive');
-        if (startH >= 6 && startH < 20 && endH >= 20) parts.push('🌅 Sunset during drive');
-    }
-    return parts.join(' · ');
-}
-
-function showDirections(directionsResult, routeIndex) {
+function showDirections(directionsResult, routeIndex, rd) {
     directionsPanel.classList.remove('hidden');
     directionsPanel.innerHTML = '';
     const route = directionsResult.routes[routeIndex];
@@ -523,22 +569,43 @@ function showDirections(directionsResult, routeIndex) {
 
     const header = document.createElement('div');
     header.className = 'directions-header';
-    header.innerHTML = `<div class="dir-endpoints"><strong>${leg.start_address.split(',')[0]}</strong> → <strong>${leg.end_address.split(',')[0]}</strong></div>`;
+    let headerContent = `<div class="dir-route-summary">
+        <div class="dir-endpoints"><strong>${leg.start_address.split(',')[0]}</strong> → <strong>${leg.end_address.split(',')[0]}</strong></div>
+        <div class="dir-stats">${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} mi</div>`;
+    if (rd) {
+        headerContent += `<div class="dir-safety ${rd.safetyLabel.cls}">${rd.safetyLabel.icon} ${rd.safetyLabel.text}</div>`;
+        const daylight = getDaylightInfo(rd.weatherData);
+        if (daylight) headerContent += `<div class="dir-daylight">${daylight}</div>`;
+    }
+    headerContent += '</div>';
+    header.innerHTML = headerContent;
     directionsPanel.appendChild(header);
 
-    leg.steps.forEach(step => {
+    const stepsContainer = document.createElement('div');
+    stepsContainer.className = 'steps-list';
+
+    leg.steps.forEach((step, i) => {
         const row = document.createElement('div');
         row.className = 'direction-step';
         const icon = getManeuverIcon(step.maneuver || '', step.instructions || '');
-        row.innerHTML = `<div class="step-icon">${icon}</div><div class="step-content"><div class="step-instruction">${step.instructions}</div><div class="step-dist">${step.distance ? step.distance.text : ''}</div></div>`;
+        row.innerHTML = `
+            <div class="step-number">${i + 1}</div>
+            <div class="step-icon">${icon}</div>
+            <div class="step-content">
+                <div class="step-instruction">${step.instructions}</div>
+                <div class="step-dist">${step.distance ? step.distance.text : ''} ${step.duration ? '· ' + step.duration.text : ''}</div>
+            </div>
+        `;
         row.addEventListener('click', () => { map.panTo(step.start_location); map.setZoom(16); });
-        directionsPanel.appendChild(row);
+        stepsContainer.appendChild(row);
     });
 
     const arrive = document.createElement('div');
     arrive.className = 'direction-step arrive';
-    arrive.innerHTML = `<div class="step-icon">📍</div><div class="step-content"><div class="step-instruction"><strong>Arrive at ${leg.end_address.split(',')[0]}</strong></div></div>`;
-    directionsPanel.appendChild(arrive);
+    arrive.innerHTML = `<div class="step-number">✓</div><div class="step-icon">📍</div><div class="step-content"><div class="step-instruction"><strong>Arrive at ${leg.end_address.split(',')[0]}</strong></div></div>`;
+    stepsContainer.appendChild(arrive);
+
+    directionsPanel.appendChild(stepsContainer);
 }
 
 function showWeatherChart(weatherData) {
@@ -558,28 +625,28 @@ function showWeatherChart(weatherData) {
         if (i === 0) tempPath += `M${x},${y}`;
         else tempPath += ` L${x},${y}`;
         const precipH = (wp.precipitationProb / 100) * chartH;
-        precipBars += `<rect x="${x - 8}" y="${chartH - precipH}" width="16" height="${precipH}" fill="#4285f4" opacity="0.3" rx="2"/>`;
+        precipBars += `<rect x="${x - 8}" y="${chartH - precipH}" width="16" height="${precipH}" fill="#3b82f6" opacity="0.2" rx="2"/>`;
     });
 
     let labels = '';
     valid.forEach((wp, i) => {
         const x = i * 60 + 30;
         const y = chartH - ((wp.temperature - minTemp) / range) * (chartH - 10) - 5;
-        labels += `<text x="${x}" y="${y - 6}" text-anchor="middle" font-size="10" fill="#3c4043">${Math.round(wp.temperature)}°</text>`;
+        labels += `<text x="${x}" y="${y - 6}" text-anchor="middle" font-size="10" fill="#1e293b" font-weight="600">${Math.round(wp.temperature)}°</text>`;
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        labels += `<text x="${x}" y="${chartH + 12}" text-anchor="middle" font-size="9" fill="#80868b">${timeStr}</text>`;
+        labels += `<text x="${x}" y="${chartH + 12}" text-anchor="middle" font-size="9" fill="#94a3b8">${timeStr}</text>`;
         if (wp.precipitationProb > 0) {
-            labels += `<text x="${x}" y="${chartH + 22}" text-anchor="middle" font-size="9" fill="#4285f4">${wp.precipitationProb}%</text>`;
+            labels += `<text x="${x}" y="${chartH + 22}" text-anchor="middle" font-size="9" fill="#3b82f6">${wp.precipitationProb}%</text>`;
         }
     });
 
     weatherChart.innerHTML = `<svg width="${w}" height="${chartH + 26}" viewBox="0 0 ${w} ${chartH + 26}">
         ${precipBars}
-        <path d="${tempPath}" fill="none" stroke="#ea4335" stroke-width="2"/>
+        <path d="${tempPath}" fill="none" stroke="#ef4444" stroke-width="2"/>
         ${valid.map((wp, i) => {
             const x = i * 60 + 30;
             const y = chartH - ((wp.temperature - minTemp) / range) * (chartH - 10) - 5;
-            return `<circle cx="${x}" cy="${y}" r="3" fill="#ea4335"/>`;
+            return `<circle cx="${x}" cy="${y}" r="3" fill="#ef4444"/>`;
         }).join('')}
         ${labels}
     </svg>`;
@@ -599,6 +666,84 @@ function getWeatherAlerts(weatherData) {
         else if (wp.temperature >= 100) alerts.push({ type: 'caution', icon: '🔥', text: `Extreme heat (${Math.round(wp.temperature)}°F) near ${wp.locationName}` });
     }
     return alerts;
+}
+
+async function findBestDepartureTime() {
+    if (!originInput.value.trim() || !destinationInput.value.trim()) {
+        showError('Enter origin and destination first.');
+        return;
+    }
+    bestTimeBtn.disabled = true;
+    bestTimeBtn.textContent = 'Analyzing...';
+    bestTimeResult.classList.remove('hidden');
+    bestTimeResult.innerHTML = '<div class="loading">Checking weather for different times...</div>';
+
+    try {
+        const waypoints = waypointInputs.filter(w => w.value.trim()).map(w => ({ location: w.value.trim(), stopover: true }));
+        const result = await getRoute(originInput.value, destinationInput.value, waypoints);
+        const today = departureDateInput.value || new Date().toISOString().split('T')[0];
+        const hours = [6, 8, 10, 12, 14, 16, 18];
+        const results = [];
+
+        for (const h of hours) {
+            const depTime = new Date(`${today}T${String(h).padStart(2,'0')}:00:00`);
+            if (depTime < new Date()) continue;
+            const wp = sampleWaypoints(result, 0, depTime);
+            const weather = await getWeatherForWaypoints(wp);
+            const score = calcRouteScore(weather);
+            const safety = getSafetyLabel(score);
+            results.push({ hour: h, score, safety, weather });
+        }
+
+        if (!results.length) {
+            bestTimeResult.innerHTML = '<div class="best-time-card">No future departure times available today.</div>';
+            return;
+        }
+
+        results.sort((a, b) => b.score - a.score);
+        const best = results[0];
+        const ampm = best.hour < 12 ? 'AM' : 'PM';
+        const h12 = best.hour === 0 ? 12 : best.hour > 12 ? best.hour - 12 : best.hour;
+
+        let html = `<div class="best-time-card">
+            <div class="best-time-title">Best time to leave</div>
+            <div class="best-time-value">${h12}:00 ${ampm}</div>
+            <div class="best-time-safety ${best.safety.cls}">${best.safety.icon} ${best.safety.text}</div>
+            <div class="best-time-options">`;
+        results.forEach(r => {
+            const ap = r.hour < 12 ? 'AM' : 'PM';
+            const h = r.hour === 0 ? 12 : r.hour > 12 ? r.hour - 12 : r.hour;
+            const isB = r === best;
+            html += `<button class="best-time-option ${isB ? 'best' : ''}" data-hour="${r.hour}">
+                <span class="bto-time">${h}${ap}</span>
+                <span class="bto-safety ${r.safety.cls}">${r.safety.icon}</span>
+            </button>`;
+        });
+        html += '</div></div>';
+        bestTimeResult.innerHTML = html;
+
+        bestTimeResult.querySelectorAll('.best-time-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const hour = parseInt(btn.dataset.hour);
+                useGoNow = false;
+                pickTimeBtn.classList.add('active');
+                goNowBtn.classList.remove('active');
+                pickTimeSection.classList.remove('hidden');
+                departureTimeInput.value = `${String(hour).padStart(2,'0')}:00`;
+                departureSlider.value = hour;
+                const ap = hour < 12 ? 'AM' : 'PM';
+                const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                sliderTimeLabel.textContent = `${h}:00 ${ap}`;
+                planTrip();
+            });
+        });
+
+    } catch (err) {
+        bestTimeResult.innerHTML = `<div class="best-time-card">Could not analyze: ${err.message}</div>`;
+    } finally {
+        bestTimeBtn.disabled = false;
+        bestTimeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg> Best departure time';
+    }
 }
 
 function getRoute(origin, destination, waypoints) {
@@ -687,11 +832,11 @@ async function getWeatherForWaypoints(waypoints) {
 }
 
 const weatherCategories = {
-    clear: { label: 'Clear', color: '#34a853', icon: '☀️', codes: [0, 1] },
-    cloudy: { label: 'Cloudy', color: '#9aa0a6', icon: '☁️', codes: [2, 3, 45, 48] },
-    rain: { label: 'Rain', color: '#4285f4', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
-    snow: { label: 'Snow', color: '#a142f4', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
-    storm: { label: 'Storm', color: '#ea4335', icon: '⚡', codes: [95, 96, 99] },
+    clear: { label: 'Clear', color: '#22c55e', icon: '☀️', codes: [0, 1] },
+    cloudy: { label: 'Cloudy', color: '#94a3b8', icon: '☁️', codes: [2, 3, 45, 48] },
+    rain: { label: 'Rain', color: '#3b82f6', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
+    snow: { label: 'Snow', color: '#a855f7', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
+    storm: { label: 'Storm', color: '#ef4444', icon: '⚡', codes: [95, 96, 99] },
 };
 
 function getWeatherCategory(code) {
@@ -710,7 +855,7 @@ function buildWeatherBar(weatherData) {
     for (let i = 0; i < weatherData.length; i++) {
         const wp = weatherData[i];
         const cat = getWeatherCategory(wp.weatherCode);
-        const catInfo = cat === 'unknown' ? { color: '#e8eaed', icon: '❓' } : weatherCategories[cat];
+        const catInfo = cat === 'unknown' ? { color: '#e2e8f0', icon: '❓' } : weatherCategories[cat];
         const info = wp.noForecast ? { icon: '—' } : weatherCodeToInfo(wp.weatherCode);
         icons.push({ icon: info.icon, fraction: wp.fraction });
         if (i < weatherData.length - 1) segments.push({ width: (weatherData[i + 1].fraction - wp.fraction) * 100, color: catInfo.color });
@@ -726,7 +871,7 @@ function getStepTrafficSegments(route) {
     const totalDuration = leg.duration.value;
     const totalTraffic = leg.duration_in_traffic ? leg.duration_in_traffic.value : totalDuration;
     const ratio = totalTraffic / totalDuration;
-    const green = '#34a853', orange = '#ea8600', red = '#ea4335';
+    const green = '#22c55e', orange = '#f59e0b', red = '#ef4444';
     if (!leg.duration_in_traffic || ratio <= 1.02) return { segments: [{ pct: 100, color: green }], label: 'Clear', labelColor: green };
     const delayMin = Math.round((totalTraffic - totalDuration) / 60);
     const raw = [];
@@ -745,7 +890,7 @@ function showOverlaysOnMap(weatherData) {
         const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const temp = wp.noForecast ? '?' : `${Math.round(wp.temperature)}°`;
         let detail;
-        if (wp.noForecast) detail = `<div class="overlay-detail"><strong>${wp.locationName}</strong><br>${timeStr} · ${dateStr}<br><span style="color:#80868b">No forecast</span></div>`;
+        if (wp.noForecast) detail = `<div class="overlay-detail"><strong>${wp.locationName}</strong><br>${timeStr} · ${dateStr}<br><span style="color:#94a3b8">No forecast</span></div>`;
         else {
             const precip = wp.precipitationAmount > 0 ? `<br>Precip: ${wp.precipitationAmount.toFixed(2)}" · ${wp.precipitationProb}%` : (wp.precipitationProb > 0 ? `<br>${wp.precipitationProb}% chance of precip` : '');
             detail = `<div class="overlay-detail"><strong>${wp.locationName}</strong><br>${timeStr} · ${dateStr}<br>${info.desc}<br>Wind: ${Math.round(wp.windSpeed)} mph${precip}</div>`;
@@ -761,18 +906,18 @@ function showWeatherCards(weatherData) {
     weatherData.forEach(wp => {
         const info = wp.noForecast ? { icon: '—', desc: 'No forecast' } : weatherCodeToInfo(wp.weatherCode);
         const cat = getWeatherCategory(wp.weatherCode);
-        const catInfo = (cat !== 'unknown' && weatherCategories[cat]) ? weatherCategories[cat] : { color: '#9aa0a6' };
-        const borderColor = wp.noForecast ? '#dadce0' : catInfo.color;
+        const catInfo = (cat !== 'unknown' && weatherCategories[cat]) ? weatherCategories[cat] : { color: '#94a3b8' };
+        const borderColor = wp.noForecast ? '#e2e8f0' : catInfo.color;
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const label = wp.isStart ? 'Start' : wp.isEnd ? 'End' : `${wp.distanceMiles} mi`;
         const card = document.createElement('div');
         card.className = 'weather-card';
         card.style.borderLeftColor = borderColor;
         if (wp.noForecast) {
-            card.innerHTML = `<div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div><div class="weather-icon" style="opacity:0.4">—</div><div class="temp" style="color:#80868b">N/A</div>`;
+            card.innerHTML = `<div class="card-top"><div class="weather-icon" style="opacity:0.4">—</div><div class="card-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div></div><div class="temp" style="color:#94a3b8">N/A</div>`;
         } else {
             const precipText = wp.precipitationAmount > 0 ? `${wp.precipitationAmount.toFixed(2)}"` : `${wp.precipitationProb}%`;
-            card.innerHTML = `<div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div><div class="weather-icon">${info.icon}</div><div class="temp">${Math.round(wp.temperature)}°F</div><div class="description">${info.desc}</div><div class="extra">💨 ${Math.round(wp.windSpeed)} mph · 💧 ${precipText}</div>`;
+            card.innerHTML = `<div class="card-top"><div class="weather-icon">${info.icon}</div><div class="card-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div></div><div class="card-weather-row"><span class="temp">${Math.round(wp.temperature)}°F</span><span class="description">${info.desc}</span></div><div class="extra">💨 ${Math.round(wp.windSpeed)} mph · 💧 ${precipText}</div>`;
         }
         card.addEventListener('click', () => { map.panTo({ lat: wp.lat, lng: wp.lon }); map.setZoom(10); });
         timelineCards.appendChild(card);
@@ -794,8 +939,9 @@ function shareTrip() {
         navigator.share({ title: 'Weather on the Road', text }).catch(() => {});
     } else {
         navigator.clipboard.writeText(text).then(() => {
-            shareTripBtn.title = 'Copied!';
-            setTimeout(() => shareTripBtn.title = 'Share trip', 2000);
+            const orig = shareTripBtn.innerHTML;
+            shareTripBtn.innerHTML = '✓ Copied!';
+            setTimeout(() => shareTripBtn.innerHTML = orig, 2000);
         });
     }
 }
@@ -806,10 +952,10 @@ function printTrip() {
     const route = currentDirectionsResult.routes[rd ? rd.routeIndex : 0];
     const leg = route.legs[0];
     const w = window.open('', '_blank');
-    w.document.write(`<html><head><title>Trip Summary</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px}h1{color:#1a73e8;font-size:20px}h2{font-size:16px;margin-top:20px;border-bottom:1px solid #e8eaed;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin:10px 0}td,th{padding:6px 10px;text-align:left;border-bottom:1px solid #f1f3f4;font-size:13px}th{background:#f8f9fa;font-weight:500}.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;margin-right:4px}.score{background:#e8f0fe;color:#1967d2}@media print{body{margin:0}}</style></head><body>`);
+    w.document.write(`<html><head><title>Trip Summary</title><style>body{font-family:'Inter',Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px;color:#1e293b}h1{color:#3b82f6;font-size:20px}h2{font-size:16px;margin-top:24px;border-bottom:2px solid #f1f5f9;padding-bottom:6px;color:#0f172a}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{padding:8px 12px;text-align:left;border-bottom:1px solid #f1f5f9;font-size:13px}th{background:#f8fafc;font-weight:600}.safety{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;margin:6px 0}@media print{body{margin:0}}</style></head><body>`);
     w.document.write(`<h1>🚗 Trip: ${leg.start_address} → ${leg.end_address}</h1>`);
     w.document.write(`<p>${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} miles via ${route.summary || 'route'}</p>`);
-    if (rd) w.document.write(`<p><span class="badge score">Route Score: ${rd.score}/10</span></p>`);
+    if (rd) w.document.write(`<p class="safety" style="background:#f0fdf4;color:#166534">${rd.safetyLabel.icon} ${rd.safetyLabel.text}</p>`);
     w.document.write(`<h2>Weather Forecast</h2><table><tr><th>Time</th><th>Location</th><th>Weather</th><th>Temp</th><th>Wind</th><th>Precip</th></tr>`);
     currentWeatherData.filter(wp => !wp.noForecast).forEach(wp => {
         const info = weatherCodeToInfo(wp.weatherCode);
@@ -825,7 +971,7 @@ function printTrip() {
     }
     w.document.write(`<h2>Directions</h2><ol>`);
     leg.steps.forEach(step => w.document.write(`<li>${step.instructions} — ${step.distance ? step.distance.text : ''}</li>`));
-    w.document.write(`</ol><p style="color:#80868b;font-size:11px;margin-top:30px">Generated by Weather on the Road · ${new Date().toLocaleDateString()}</p></body></html>`);
+    w.document.write(`</ol><p style="color:#94a3b8;font-size:11px;margin-top:30px">Generated by Weather on the Road · ${new Date().toLocaleDateString()}</p></body></html>`);
     w.document.close();
     w.print();
 }
@@ -859,16 +1005,16 @@ function loadRecentSearches() {
 
 function getManeuverIcon(maneuver, instructions) {
     const text = (maneuver + ' ' + instructions).toLowerCase();
-    if (text.includes('uturn') || text.includes('u-turn')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M18 9v12h-2V9c0-2.21-1.79-4-4-4S8 6.79 8 9v4.17l1.59-1.59L11 13l-4 4-4-4 1.41-1.41L6 13.17V9c0-3.31 2.69-6 6-6s6 2.69 6 6z"/></svg>';
-    if (text.includes('sharp-left') || text.includes('sharp left')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M6 6.83L4.41 8.41 3 7l4-4 4 4-1.41 1.41L8 6.83V13h8c1.1 0 2 .9 2 2v6h-2v-6H8c-1.1 0-2-.9-2-2V6.83z"/></svg>';
-    if (text.includes('sharp-right') || text.includes('sharp right')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M18 6.83l-1.59 1.58L15 7l4-4 4 4-1.41 1.41L20 6.83V13h-8c-1.1 0-2 .9-2 2v6H8v-6c0-1.1-.9-2-2-2h8V6.83z"/></svg>';
-    if (text.includes('turn-left') || text.includes('turn left') || text.includes('left')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M14 7l-5 5 5 5V7zm7 10v2H3v-2h18z"/></svg>';
-    if (text.includes('turn-right') || text.includes('turn right') || text.includes('right')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M10 17l5-5-5-5v10zm-7 0v2h18v-2H3z"/></svg>';
-    if (text.includes('roundabout')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-13v2.17l-1.59-1.59L8 9l4 4 4-4-1.41-1.41L13 9.17V7h-2z"/></svg>';
-    if (text.includes('merge')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M17 4l-1.41 1.41L17.17 7H8c-2.76 0-5 2.24-5 5v5h2v-5c0-1.65 1.35-3 3-3h9.17l-1.58 1.59L17 12l4-4-4-4z"/></svg>';
-    if (text.includes('ramp') || text.includes('exit') || text.includes('off-ramp')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M18 6.83l1.59 1.58L21 7l-4-4-4 4 1.41 1.41L16 6.83V10c0 3.07-1.64 5.64-4 7.08V4h-2v13.08C7.64 15.64 6 13.07 6 10V6.83L7.59 8.41 9 7 5 3 1 7l1.41 1.41L4 6.83V10c0 3.72 2.01 6.94 5 8.72V21h6v-2.28c2.99-1.78 5-5 5-8.72V6.83z"/></svg>';
-    if (text.includes('fork')) return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M14 7l5 5-5 5V7zM3 17v2h18v-2H3zM10 7v10l-5-5 5-5z"/></svg>';
-    return '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#5f6368" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>';
+    if (text.includes('uturn') || text.includes('u-turn')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M18 9v12h-2V9c0-2.21-1.79-4-4-4S8 6.79 8 9v4.17l1.59-1.59L11 13l-4 4-4-4 1.41-1.41L6 13.17V9c0-3.31 2.69-6 6-6s6 2.69 6 6z"/></svg>';
+    if (text.includes('sharp-left') || text.includes('sharp left')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M6 6.83L4.41 8.41 3 7l4-4 4 4-1.41 1.41L8 6.83V13h8c1.1 0 2 .9 2 2v6h-2v-6H8c-1.1 0-2-.9-2-2V6.83z"/></svg>';
+    if (text.includes('sharp-right') || text.includes('sharp right')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M18 6.83l-1.59 1.58L15 7l4-4 4 4-1.41 1.41L20 6.83V13h-8c-1.1 0-2 .9-2 2v6H8v-6c0-1.1-.9-2-2-2h8V6.83z"/></svg>';
+    if (text.includes('turn-left') || text.includes('turn left') || text.includes('left')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M14 7l-5 5 5 5V7zm7 10v2H3v-2h18z"/></svg>';
+    if (text.includes('turn-right') || text.includes('turn right') || text.includes('right')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M10 17l5-5-5-5v10zm-7 0v2h18v-2H3z"/></svg>';
+    if (text.includes('roundabout')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-13v2.17l-1.59-1.59L8 9l4 4 4-4-1.41-1.41L13 9.17V7h-2z"/></svg>';
+    if (text.includes('merge')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M17 4l-1.41 1.41L17.17 7H8c-2.76 0-5 2.24-5 5v5h2v-5c0-1.65 1.35-3 3-3h9.17l-1.58 1.59L17 12l4-4-4-4z"/></svg>';
+    if (text.includes('ramp') || text.includes('exit') || text.includes('off-ramp')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M18 6.83l1.59 1.58L21 7l-4-4-4 4 1.41 1.41L16 6.83V10c0 3.07-1.64 5.64-4 7.08V4h-2v13.08C7.64 15.64 6 13.07 6 10V6.83L7.59 8.41 9 7 5 3 1 7l1.41 1.41L4 6.83V10c0 3.72 2.01 6.94 5 8.72V21h6v-2.28c2.99-1.78 5-5 5-8.72V6.83z"/></svg>';
+    if (text.includes('fork')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M14 7l5 5-5 5V7zM3 17v2h18v-2H3zM10 7v10l-5-5 5-5z"/></svg>';
+    return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>';
 }
 
 function initTimelineDrag() {
