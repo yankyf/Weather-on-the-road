@@ -7,56 +7,45 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div id="app">
-        <header>
-            <h1>Weather on the Road</h1>
-        </header>
-
-        <div id="main-content">
-            <div id="map-row">
-                <div id="side-panel">
-                    <div id="search-panel">
-                        <div class="search-field">
-                            <label>From</label>
-                            <input type="text" id="origin" placeholder="Search starting point..." autocomplete="off" />
-                        </div>
-                        <div class="search-field">
-                            <label>To</label>
-                            <input type="text" id="destination" placeholder="Search destination..." autocomplete="off" />
-                        </div>
-                        <div class="search-row">
-                            <div class="search-field small">
-                                <label>Date</label>
-                                <input type="date" id="departure-date" />
-                            </div>
-                            <div class="search-field small">
-                                <label>Time</label>
-                                <input type="time" id="departure-time" value="08:00" />
-                            </div>
-                        </div>
-                        <div class="search-actions">
-                            <label class="toggle-label">
-                                <input type="checkbox" id="toggle-overlays" checked />
-                                Weather icons
-                            </label>
-                            <button id="plan-trip">Go</button>
-                        </div>
-                    </div>
-                    <div id="directions-panel"></div>
-                    <div id="weather-info-panel" class="hidden">
-                        <div id="weather-bars-section"></div>
-                    </div>
-                </div>
-                <div id="map-container">
-                    <div id="map"></div>
-                </div>
+    <div id="side-panel">
+        <div id="search-section">
+            <div class="panel-header">
+                <span class="panel-title">Weather on the Road</span>
             </div>
-            <div id="error-message" class="error hidden"></div>
-            <div id="weather-timeline" class="hidden">
-                <h2>Weather Along Your Route</h2>
-                <div id="timeline-cards"></div>
+            <div class="search-inputs">
+                <div class="search-input-row">
+                    <span class="search-dot origin-dot"></span>
+                    <input type="text" id="origin" placeholder="Choose starting point..." autocomplete="off" />
+                </div>
+                <div class="search-input-row">
+                    <span class="search-dot dest-dot"></span>
+                    <input type="text" id="destination" placeholder="Choose destination..." autocomplete="off" />
+                </div>
+                <div class="datetime-row">
+                    <input type="date" id="departure-date" />
+                    <input type="time" id="departure-time" value="08:00" />
+                    <button id="plan-trip">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </div>
+                <label class="toggle-label">
+                    <input type="checkbox" id="toggle-overlays" checked />
+                    Show weather on map
+                </label>
             </div>
         </div>
+        <div id="directions-panel"></div>
+        <div id="weather-info-panel" class="hidden">
+            <div id="weather-bars-section"></div>
+        </div>
+        <div id="error-message" class="error hidden"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="weather-timeline" class="hidden">
+        <h2>Weather Along Your Route</h2>
+        <div id="timeline-cards"></div>
     </div>
 
     <script src="app.js"></script>

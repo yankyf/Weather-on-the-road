@@ -491,18 +491,16 @@ function showWeatherCards(weatherData) {
     weatherData.forEach((wp) => {
         const info = wp.noForecast ? { icon: '—', desc: 'No forecast available' } : weatherCodeToInfo(wp.weatherCode);
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const label = wp.isStart ? 'Departure' : wp.isEnd ? 'Arrival' : `${wp.distanceMiles} mi`;
         const cardClass = wp.isStart ? 'start' : wp.isEnd ? 'end' : '';
 
         const card = document.createElement('div');
         card.className = `weather-card ${cardClass}`;
         if (wp.noForecast) {
-            card.innerHTML = `<div class="time-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${dateStr}</div><div class="arrival-time">${label}</div></div><div class="weather-icon" style="opacity:0.4">—</div><div class="weather-details"><div class="temp" style="color:#a0aec0">N/A</div><div class="description" style="color:#a0aec0">Forecast not available this far ahead</div></div>`;
+            card.innerHTML = `<div class="time-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div><div class="weather-icon" style="opacity:0.4">—</div><div class="weather-details"><div class="temp" style="color:#80868b">N/A</div><div class="description" style="color:#80868b">No forecast</div></div>`;
         } else {
-            card.innerHTML = `<div class="time-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${dateStr}</div><div class="arrival-time">${label}</div></div><div class="weather-icon">${info.icon}</div><div class="weather-details"><div class="temp">${Math.round(wp.temperature)}°F</div><div class="description">${info.desc}</div><div class="extra">Wind: ${Math.round(wp.windSpeed)} mph · Humidity: ${wp.humidity}%${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% chance of precip` : ''}</div></div>`;
+            card.innerHTML = `<div class="time-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div><div class="weather-icon">${info.icon}</div><div class="weather-details"><div class="temp">${Math.round(wp.temperature)}°F</div><div class="description">${info.desc}</div><div class="extra">Wind ${Math.round(wp.windSpeed)} mph${wp.precipitationProb > 0 ? ` · ${wp.precipitationProb}% precip` : ''}</div></div>`;
         }
-        card.style.cursor = 'pointer';
         card.addEventListener('click', () => {
             map.panTo({ lat: wp.lat, lng: wp.lon });
             map.setZoom(10);
