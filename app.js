@@ -1,5 +1,6 @@
-const originInput = document.getElementById('origin');
-const destinationInput = document.getElementById('destination');
+const allStopsContainer = document.getElementById('all-stops');
+let originInput = allStopsContainer.querySelector('.stop-row:first-child input');
+let destinationInput = allStopsContainer.querySelector('.stop-row:last-child input');
 const departureDateInput = document.getElementById('departure-date');
 const departureTimeInput = document.getElementById('departure-time');
 const planButton = document.getElementById('plan-trip');
@@ -12,7 +13,6 @@ const routesList = document.getElementById('routes-list');
 const myLocationBtn = document.getElementById('my-location-btn');
 const swapBtn = document.getElementById('swap-btn');
 const addWaypointBtn = document.getElementById('add-waypoint-btn');
-const waypointsContainer = document.getElementById('waypoints-container');
 const directionsPanel = document.getElementById('directions-panel');
 const recentSearchesDiv = document.getElementById('recent-searches');
 const recentList = document.getElementById('recent-list');
@@ -38,7 +38,7 @@ let lastRouteBounds = null;
 let currentWeatherData = null;
 let currentRouteData = null;
 let currentDirectionsResult = null;
-let mapClickMode = null;
+let pickTargetInput = null;
 let pickMarker = null;
 let myLocationMarker = null;
 let waypointInputs = [];
@@ -55,10 +55,78 @@ sliderTimeLabel.textContent = `${_h12}:00 ${_ampm}`;
 loadRecentSearches();
 
 function updateClearButtons() {
-    const co = document.getElementById('clear-origin');
-    const cd = document.getElementById('clear-dest');
-    if (co) co.classList.toggle('hidden', !originInput.value);
-    if (cd) cd.classList.toggle('hidden', !destinationInput.value);
+    const rows = allStopsContainer.querySelectorAll('.stop-row');
+    const showRemove = rows.length >= 3;
+    rows.forEach(row => {
+        const btn = row.querySelector('.stop-remove-btn');
+        if (btn) btn.classList.toggle('hidden', !showRemove);
+    });
+}
+
+function updateStopReferences() {
+    const inputs = [...allStopsContainer.querySelectorAll('.stop-row input')];
+    originInput = inputs[0];
+    destinationInput = inputs[inputs.length - 1];
+    waypointInputs = inputs.slice(1, -1);
+    updateStopIndicators();
+    updateClearButtons();
+}
+
+function updateStopIndicators() {
+    const rows = [...allStopsContainer.querySelectorAll('.stop-row')];
+    rows.forEach((row, i) => {
+        const dot = row.querySelector('.stop-dot');
+        const existingLine = row.querySelector('.dot-line');
+        if (dot) {
+            const color = i === 0 ? '#64748b' : i === rows.length - 1 ? '#3b82f6' : '#f59e0b';
+            dot.style.background = color;
+            dot.style.borderColor = color;
+        }
+        if (i > 0 && !existingLine) {
+            const wrap = row.querySelector('.input-dot-wrap');
+            if (wrap) { const line = document.createElement('span'); line.className = 'dot-line'; wrap.appendChild(line); }
+        } else if (i === 0 && existingLine) {
+            existingLine.remove();
+        }
+        const input = row.querySelector('input');
+        if (i === 0) input.placeholder = 'Starting point or click on map';
+        else if (i === rows.length - 1) input.placeholder = 'Destination or click on map';
+        else input.placeholder = 'Add a stop...';
+    });
+}
+
+function attachStopDrag(row) {
+    row.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        row.classList.add('dragging-row');
+        setTimeout(() => row.style.opacity = '0.4', 0);
+    });
+    row.addEventListener('dragend', () => {
+        row.style.opacity = '1';
+        row.classList.remove('dragging-row');
+        allStopsContainer.querySelectorAll('.stop-row').forEach(r => r.classList.remove('drag-over'));
+        updateStopReferences();
+    });
+    row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const dragging = allStopsContainer.querySelector('.dragging-row');
+        if (dragging && dragging !== row) {
+            allStopsContainer.querySelectorAll('.stop-row').forEach(r => r.classList.remove('drag-over'));
+            row.classList.add('drag-over');
+            const rect = row.getBoundingClientRect();
+            const mid = rect.top + rect.height / 2;
+            if (e.clientY < mid) allStopsContainer.insertBefore(dragging, row);
+            else allStopsContainer.insertBefore(dragging, row.nextSibling);
+        }
+    });
+}
+
+function setPickMode(inputEl) {
+    pickTargetInput = inputEl;
+    map.setOptions({ draggableCursor: 'crosshair' });
+    document.querySelectorAll('.picking').forEach(el => el.classList.remove('picking'));
+    inputEl.classList.add('picking');
 }
 
 function initApp() {
@@ -151,6 +219,26 @@ function initApp() {
             if (places && places.length > 0 && places[0].geometry) { map.panTo(places[0].geometry.location); map.setZoom(14); }
         });
 
+        // Attach drag handlers to initial stop rows
+        allStopsContainer.querySelectorAll('.stop-row').forEach(row => attachStopDrag(row));
+
+        // Event delegation for focus on stop inputs
+        allStopsContainer.addEventListener('focusin', (e) => {
+            if (e.target.tagName !== 'INPUT') return;
+            setPickMode(e.target);
+        });
+
+        // Event delegation for remove buttons
+        allStopsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.stop-remove-btn');
+            if (!btn) return;
+            const row = btn.closest('.stop-row');
+            const rows = allStopsContainer.querySelectorAll('.stop-row');
+            if (rows.length <= 2) return;
+            row.remove();
+            updateStopReferences();
+        });
+
         myLocationBtn.addEventListener('click', () => {
             if (!navigator.geolocation) { showError('Geolocation not supported.'); return; }
             myLocationBtn.style.opacity = '0.5';
@@ -177,41 +265,32 @@ function initApp() {
         });
 
         map.addListener('click', (e) => {
-            if (!mapClickMode) return;
+            if (!pickTargetInput) return;
             const latlng = e.latLng;
             if (pickMarker) pickMarker.setMap(null);
             pickMarker = new google.maps.Marker({
                 position: latlng, map,
-                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#ffffff', fillOpacity: 1, strokeColor: mapClickMode === 'origin' ? '#64748b' : '#3b82f6', strokeWeight: 3 },
+                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#ffffff', fillOpacity: 1, strokeColor: '#3b82f6', strokeWeight: 3 },
                 animation: google.maps.Animation.DROP
             });
-            let targetInput;
-            if (mapClickMode === 'origin') targetInput = originInput;
-            else if (mapClickMode === 'destination') targetInput = destinationInput;
-            else targetInput = document.getElementById(mapClickMode);
-            if (!targetInput) return;
-            targetInput.value = 'Loading address...';
-            targetInput.classList.add('chosen');
+            pickTargetInput.value = 'Loading address...';
+            pickTargetInput.classList.add('chosen');
             new google.maps.Geocoder().geocode({ location: latlng }, (results, status) => {
-                targetInput.value = (status === 'OK' && results[0]) ? results[0].formatted_address : `${latlng.lat().toFixed(6)}, ${latlng.lng().toFixed(6)}`;
-                setTimeout(() => targetInput.classList.remove('chosen'), 1500);
-                mapClickMode = null;
+                pickTargetInput.value = (status === 'OK' && results[0]) ? results[0].formatted_address : `${latlng.lat().toFixed(6)}, ${latlng.lng().toFixed(6)}`;
+                setTimeout(() => pickTargetInput.classList.remove('chosen'), 1500);
+                pickTargetInput = null;
                 map.setOptions({ draggableCursor: null });
                 document.querySelectorAll('.picking').forEach(el => el.classList.remove('picking'));
             });
         });
 
-        originInput.addEventListener('focus', () => { setPickMode('origin', originInput); });
-        destinationInput.addEventListener('focus', () => { setPickMode('destination', destinationInput); });
-
         planButton.addEventListener('click', () => {
-            mapClickMode = null;
+            pickTargetInput = null;
             map.setOptions({ draggableCursor: null });
             document.querySelectorAll('.picking').forEach(el => el.classList.remove('picking'));
             planTrip();
         });
 
-        // Go now / Pick a time toggle
         goNowBtn.addEventListener('click', () => {
             useGoNow = true;
             goNowBtn.classList.add('active');
@@ -225,7 +304,6 @@ function initApp() {
             pickTimeSection.classList.remove('hidden');
         });
 
-        // Radar toggle
         document.getElementById('toggle-radar').addEventListener('change', (e) => {
             if (e.target.checked) enableRadar();
             else disableRadar();
@@ -247,17 +325,12 @@ function initApp() {
             if (currentDirectionsResult) planTrip();
         });
 
-        // Clear input buttons
-        document.getElementById('clear-origin').addEventListener('click', () => { originInput.value = ''; originInput.focus(); });
-        document.getElementById('clear-dest').addEventListener('click', () => { destinationInput.value = ''; destinationInput.focus(); });
         setInterval(updateClearButtons, 300);
 
-        // Show full trip button
         document.getElementById('show-full-trip').addEventListener('click', () => {
             if (lastRouteBounds) map.fitBounds(lastRouteBounds, { top: 20, left: 420, right: 40, bottom: 220 });
         });
 
-        // Recent searches toggle
         const recentToggle = document.getElementById('recent-toggle');
         if (recentToggle) {
             recentToggle.addEventListener('click', () => {
@@ -268,6 +341,7 @@ function initApp() {
             });
         }
 
+        updateStopIndicators();
         initTimelineDrag();
     } catch (err) {
         showError('Google Maps failed to initialize: ' + err.message);
@@ -277,30 +351,16 @@ window.initApp = initApp;
 
 function enableRadar() {
     disableRadar();
-    fetch('https://api.rainviewer.com/public/weather-maps.json')
-        .then(r => {
-            if (!r.ok) throw new Error('Network error');
-            return r.json();
-        })
-        .then(data => {
-            const host = data.host || 'https://tilecache.rainviewer.com';
-            const past = data.radar && data.radar.past;
-            if (!past || !past.length) return;
-            const latest = past[past.length - 1];
-            radarLayer = new google.maps.ImageMapType({
-                getTileUrl: (coord, zoom) => {
-                    if (zoom > 12 || zoom < 1) return null;
-                    return `${host}${latest.path}/256/${zoom}/${coord.x}/${coord.y}/2/1_1.png`;
-                },
-                tileSize: new google.maps.Size(256, 256),
-                opacity: 0.6,
-                name: 'Radar'
-            });
-            map.overlayMapTypes.insertAt(0, radarLayer);
-        })
-        .catch(() => {
-            document.getElementById('toggle-radar').checked = false;
-        });
+    radarLayer = new google.maps.ImageMapType({
+        getTileUrl: (coord, zoom) => {
+            if (zoom > 12 || zoom < 1) return null;
+            return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/${zoom}/${coord.x}/${coord.y}.png`;
+        },
+        tileSize: new google.maps.Size(256, 256),
+        opacity: 0.6,
+        name: 'Radar'
+    });
+    map.overlayMapTypes.insertAt(0, radarLayer);
 }
 
 function disableRadar() {
@@ -311,59 +371,26 @@ function disableRadar() {
     radarLayer = null;
 }
 
-function setPickMode(mode, inputEl) {
-    mapClickMode = mode;
-    map.setOptions({ draggableCursor: 'crosshair' });
-    document.querySelectorAll('.picking').forEach(el => el.classList.remove('picking'));
-    inputEl.classList.add('picking');
-}
-
 function addWaypoint() {
-    const id = 'waypoint-' + waypointInputs.length;
     const row = document.createElement('div');
-    row.className = 'search-input-row waypoint-row';
+    row.className = 'search-input-row stop-row';
     row.draggable = true;
     row.innerHTML = `
         <span class="drag-handle" title="Drag to reorder">⠿</span>
-        <div class="input-dot-wrap"><span class="dot waypoint-dot"></span><span class="dot-line"></span></div>
-        <input type="text" id="${id}" placeholder="Add a stop..." autocomplete="off" />
-        <button class="remove-waypoint" title="Remove stop">&times;</button>
+        <div class="input-dot-wrap"><span class="dot stop-dot"></span><span class="dot-line"></span></div>
+        <input type="text" placeholder="Add a stop..." autocomplete="off" />
+        <button class="stop-remove-btn">&times;</button>
     `;
-    waypointsContainer.appendChild(row);
+    const lastRow = allStopsContainer.querySelector('.stop-row:last-child');
+    allStopsContainer.insertBefore(row, lastRow);
     const input = row.querySelector('input');
-    waypointInputs.push(input);
-    const sb = new google.maps.places.SearchBox(input);
-    map.addListener('bounds_changed', () => sb.setBounds(map.getBounds()));
-    input.addEventListener('focus', () => setPickMode(id, input));
-    row.querySelector('.remove-waypoint').addEventListener('click', () => {
-        row.remove();
-        waypointInputs = waypointInputs.filter(w => w !== input);
-    });
-
-    row.addEventListener('dragstart', (e) => {
-        e.dataTransfer.effectAllowed = 'move';
-        row.classList.add('dragging-row');
-        setTimeout(() => row.style.opacity = '0.4', 0);
-    });
-    row.addEventListener('dragend', () => {
-        row.style.opacity = '1';
-        row.classList.remove('dragging-row');
-        document.querySelectorAll('.waypoint-row').forEach(r => r.classList.remove('drag-over'));
-        waypointInputs = [...waypointsContainer.querySelectorAll('.waypoint-row input')];
-    });
-    row.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const dragging = waypointsContainer.querySelector('.dragging-row');
-        if (dragging && dragging !== row) {
-            document.querySelectorAll('.waypoint-row').forEach(r => r.classList.remove('drag-over'));
-            row.classList.add('drag-over');
-            const rect = row.getBoundingClientRect();
-            const mid = rect.top + rect.height / 2;
-            if (e.clientY < mid) waypointsContainer.insertBefore(dragging, row);
-            else waypointsContainer.insertBefore(dragging, row.nextSibling);
-        }
-    });
+    if (google.maps && google.maps.places) {
+        const sb = new google.maps.places.SearchBox(input);
+        if (map) map.addListener('bounds_changed', () => sb.setBounds(map.getBounds()));
+    }
+    attachStopDrag(row);
+    updateStopReferences();
+    input.focus();
 }
 
 function clearMap() {
@@ -828,7 +855,7 @@ function getRoute(origin, destination, waypoints) {
         const req = {
             origin, destination,
             travelMode: google.maps.TravelMode.DRIVING,
-            provideRouteAlternatives: !waypoints || waypoints.length === 0,
+            provideRouteAlternatives: true,
             drivingOptions: { departureTime: new Date(), trafficModel: 'bestguess' }
         };
         if (waypoints && waypoints.length > 0) req.waypoints = waypoints;

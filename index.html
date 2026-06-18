@@ -23,24 +23,29 @@
         <div id="search-section">
             <div class="search-card">
                 <div class="search-inputs">
-                    <div class="search-input-row">
-                        <div class="input-dot-wrap"><span class="dot origin-dot"></span></div>
-                        <input type="text" id="origin" placeholder="Starting point or click on map" autocomplete="off" />
-                        <button class="clear-input-btn hidden" id="clear-origin" title="Clear">&times;</button>
+                    <div id="all-stops">
+                        <div class="search-input-row stop-row" draggable="true">
+                            <span class="drag-handle" title="Drag to reorder">⠿</span>
+                            <div class="input-dot-wrap"><span class="dot stop-dot"></span></div>
+                            <input type="text" placeholder="Starting point or click on map" autocomplete="off" />
+                            <button class="stop-remove-btn hidden">&times;</button>
+                        </div>
+                        <div class="search-input-row stop-row" draggable="true">
+                            <span class="drag-handle" title="Drag to reorder">⠿</span>
+                            <div class="input-dot-wrap"><span class="dot stop-dot"></span><span class="dot-line"></span></div>
+                            <input type="text" placeholder="Destination or click on map" autocomplete="off" />
+                            <button class="stop-remove-btn hidden">&times;</button>
+                        </div>
+                    </div>
+                    <div class="stops-actions-row">
+                        <button id="add-waypoint-btn" class="add-waypoint-btn">+ Add stop</button>
                         <button id="my-location-btn" title="Use my location">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
                         </button>
-                        <button id="swap-btn" title="Swap origin and destination">
+                        <button id="swap-btn" title="Swap first and last stops">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
                         </button>
                     </div>
-                    <div class="search-input-row">
-                        <div class="input-dot-wrap"><span class="dot dest-dot"></span><span class="dot-line"></span></div>
-                        <input type="text" id="destination" placeholder="Destination or click on map" autocomplete="off" />
-                        <button class="clear-input-btn hidden" id="clear-dest" title="Clear">&times;</button>
-                    </div>
-                    <div id="waypoints-container"></div>
-                    <button id="add-waypoint-btn" class="add-waypoint-btn">+ Add stop</button>
                 </div>
 
                 <div class="departure-mode-row">
