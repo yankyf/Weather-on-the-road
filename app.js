@@ -43,6 +43,7 @@ let pickMarker = null;
 let myLocationMarker = null;
 let waypointInputs = [];
 let useGoNow = true;
+let travelMode = 'DRIVING';
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -309,6 +310,37 @@ function initApp() {
             else disableRadar();
         });
 
+        // Travel mode buttons
+        document.querySelectorAll('.travel-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.travel-mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const mode = btn.dataset.mode;
+                travelMode = mode === 'MOTORCYCLE' ? 'DRIVING' : mode;
+                if (currentDirectionsResult) planTrip();
+            });
+        });
+
+        // Auto-detect current location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                if (myLocationMarker) myLocationMarker.setMap(null);
+                myLocationMarker = new google.maps.Marker({
+                    position: latlng, map,
+                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 },
+                    title: 'Your location', zIndex: 999
+                });
+                map.panTo(latlng);
+                map.setZoom(12);
+                new google.maps.Geocoder().geocode({ location: latlng }, (results, status) => {
+                    if (status === 'OK' && results[0] && !originInput.value) {
+                        originInput.value = results[0].formatted_address;
+                    }
+                });
+            }, () => {});
+        }
+
         addWaypointBtn.addEventListener('click', addWaypoint);
         shareTripBtn.addEventListener('click', shareTrip);
         printTripBtn.addEventListener('click', printTrip);
@@ -399,6 +431,7 @@ function clearMap() {
     routeInfoOverlays.forEach(o => o.setMap(null)); routeInfoOverlays = [];
     if (pickMarker) { pickMarker.setMap(null); pickMarker = null; }
     directionsPanel.innerHTML = ''; directionsPanel.classList.add('hidden');
+    tripActions.classList.add('hidden');
     document.getElementById('show-full-trip').classList.add('hidden');
 }
 
@@ -852,12 +885,15 @@ async function findBestDepartureTime() {
 
 function getRoute(origin, destination, waypoints) {
     return new Promise((resolve, reject) => {
+        const mode = google.maps.TravelMode[travelMode] || google.maps.TravelMode.DRIVING;
         const req = {
             origin, destination,
-            travelMode: google.maps.TravelMode.DRIVING,
-            provideRouteAlternatives: true,
-            drivingOptions: { departureTime: new Date(), trafficModel: 'bestguess' }
+            travelMode: mode,
+            provideRouteAlternatives: true
         };
+        if (travelMode === 'DRIVING') {
+            req.drivingOptions = { departureTime: new Date(), trafficModel: 'bestguess' };
+        }
         if (waypoints && waypoints.length > 0) req.waypoints = waypoints;
         new google.maps.DirectionsService().route(req, (result, status) => {
             if (status === 'OK') resolve(result);

@@ -233,6 +233,44 @@ html, body {
 
 .add-waypoint-btn:hover { color: #2563eb; }
 
+/* --- Travel Mode Selector --- */
+.travel-mode-row {
+    display: flex;
+    gap: 4px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.travel-mode-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 500;
+    color: #64748b;
+    transition: all 0.15s;
+}
+
+.travel-mode-btn:hover { background: #f1f5f9; color: #334155; }
+
+.travel-mode-btn.active {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #2563eb;
+}
+
+.travel-mode-btn svg { flex-shrink: 0; }
+.travel-mode-btn.active svg { fill: #2563eb; }
+
 /* --- Departure Mode Toggle --- */
 .departure-mode-row {
     display: flex;
