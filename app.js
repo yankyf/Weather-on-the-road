@@ -26,6 +26,8 @@ const pickTimeSection = document.getElementById('pick-time-section');
 const tripActions = document.getElementById('trip-actions');
 const bestTimeBtn = document.getElementById('best-time-btn');
 const bestTimeResult = document.getElementById('best-time-result');
+const startNavBtn = document.getElementById('start-nav-btn');
+const navOverlay = document.getElementById('nav-overlay');
 
 let map = null;
 let directionsRenderers = [];
@@ -44,6 +46,15 @@ let myLocationMarker = null;
 let waypointInputs = [];
 let useGoNow = true;
 let travelMode = 'DRIVING';
+
+// Navigation state
+let navActive = false;
+let navWatchId = null;
+let navRoute = null;
+let navSteps = [];
+let navCurrentStep = 0;
+let navMarker = null;
+let navRenderer = null;
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -79,7 +90,7 @@ function updateStopIndicators() {
         const dot = row.querySelector('.stop-dot');
         const existingLine = row.querySelector('.dot-line');
         if (dot) {
-            const color = i === 0 ? '#64748b' : i === rows.length - 1 ? '#3b82f6' : '#f59e0b';
+            const color = i === 0 ? '#5f6368' : i === rows.length - 1 ? '#4285f4' : '#fbbc04';
             dot.style.background = color;
             dot.style.borderColor = color;
         }
@@ -220,16 +231,13 @@ function initApp() {
             if (places && places.length > 0 && places[0].geometry) { map.panTo(places[0].geometry.location); map.setZoom(14); }
         });
 
-        // Attach drag handlers to initial stop rows
         allStopsContainer.querySelectorAll('.stop-row').forEach(row => attachStopDrag(row));
 
-        // Event delegation for focus on stop inputs
         allStopsContainer.addEventListener('focusin', (e) => {
             if (e.target.tagName !== 'INPUT') return;
             setPickMode(e.target);
         });
 
-        // Event delegation for remove buttons
         allStopsContainer.addEventListener('click', (e) => {
             const btn = e.target.closest('.stop-remove-btn');
             if (!btn) return;
@@ -248,7 +256,7 @@ function initApp() {
                 if (myLocationMarker) myLocationMarker.setMap(null);
                 myLocationMarker = new google.maps.Marker({
                     position: latlng, map,
-                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 },
+                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#4285f4', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 },
                     title: 'Your location', zIndex: 999
                 });
                 new google.maps.Geocoder().geocode({ location: latlng }, (results, status) => {
@@ -271,7 +279,7 @@ function initApp() {
             if (pickMarker) pickMarker.setMap(null);
             pickMarker = new google.maps.Marker({
                 position: latlng, map,
-                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#ffffff', fillOpacity: 1, strokeColor: '#3b82f6', strokeWeight: 3 },
+                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#ffffff', fillOpacity: 1, strokeColor: '#4285f4', strokeWeight: 3 },
                 animation: google.maps.Animation.DROP
             });
             pickTargetInput.value = 'Loading address...';
@@ -310,25 +318,27 @@ function initApp() {
             else disableRadar();
         });
 
-        // Travel mode buttons
         document.querySelectorAll('.travel-mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.travel-mode-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 const mode = btn.dataset.mode;
-                travelMode = mode === 'MOTORCYCLE' ? 'DRIVING' : mode;
+                if (mode === 'MOTORCYCLE') {
+                    travelMode = 'DRIVING';
+                } else {
+                    travelMode = mode;
+                }
                 if (currentDirectionsResult) planTrip();
             });
         });
 
-        // Auto-detect current location
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 if (myLocationMarker) myLocationMarker.setMap(null);
                 myLocationMarker = new google.maps.Marker({
                     position: latlng, map,
-                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 },
+                    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: '#4285f4', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 },
                     title: 'Your location', zIndex: 999
                 });
                 map.panTo(latlng);
@@ -344,6 +354,8 @@ function initApp() {
         addWaypointBtn.addEventListener('click', addWaypoint);
         shareTripBtn.addEventListener('click', shareTrip);
         printTripBtn.addEventListener('click', printTrip);
+        startNavBtn.addEventListener('click', startNavigation);
+        document.getElementById('nav-stop-btn').addEventListener('click', stopNavigation);
         bestTimeBtn.addEventListener('click', findBestDepartureTime);
 
         departureSlider.addEventListener('input', () => {
@@ -587,7 +599,7 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             const renderer = new google.maps.DirectionsRenderer({
                 map, directions: directionsResult, routeIndex: rd.routeIndex,
                 suppressMarkers: !isSelected, preserveViewport: true,
-                polylineOptions: { strokeColor: isSelected ? '#3b82f6' : '#93c5fd', strokeWeight: isSelected ? 5 : 4, strokeOpacity: isSelected ? 1.0 : 0.7, zIndex: isSelected ? 10 : 1 }
+                polylineOptions: { strokeColor: isSelected ? '#4285f4' : '#a8c7fa', strokeWeight: isSelected ? 5 : 4, strokeOpacity: isSelected ? 1.0 : 0.7, zIndex: isSelected ? 10 : 1 }
             });
             directionsRenderers.push(renderer);
 
@@ -652,6 +664,8 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             }).join('') + '</div>';
         }
 
+        const modeLabel = getModeLabel();
+
         const btn = document.createElement('button');
         btn.className = `route-option ${idx === 0 ? 'selected' : ''}`;
         btn.innerHTML = `
@@ -659,7 +673,7 @@ function displayRoutes(directionsResult, routeData, departureTime) {
                 <span class="route-name">via ${summary}</span>
                 <span class="route-duration">${durationText}</span>
             </div>
-            <div class="route-meta">${distMiles} miles${daylightInfo ? ` · ${daylightInfo}` : ''}</div>
+            <div class="route-meta">${distMiles} miles · ${modeLabel}${daylightInfo ? ` · ${daylightInfo}` : ''}</div>
             <div class="route-badges">${badgesHtml}</div>
             <div class="route-bars-compact">
                 <div class="bar-row-compact weather-bar-row">
@@ -689,6 +703,13 @@ function displayRoutes(directionsResult, routeData, departureTime) {
     document.getElementById('show-full-trip').classList.remove('hidden');
 }
 
+function getModeLabel() {
+    const activeBtn = document.querySelector('.travel-mode-btn.active');
+    const mode = activeBtn ? activeBtn.dataset.mode : 'DRIVING';
+    const labels = { DRIVING: '🚗 Driving', MOTORCYCLE: '🏍️ Motorcycle', BICYCLING: '🚴 Cycling', WALKING: '🚶 Walking' };
+    return labels[mode] || '🚗 Driving';
+}
+
 function showDirections(directionsResult, routeIndex, rd) {
     directionsPanel.classList.remove('hidden');
     directionsPanel.innerHTML = '';
@@ -699,7 +720,7 @@ function showDirections(directionsResult, routeIndex, rd) {
     header.className = 'directions-header';
     let headerContent = `<div class="dir-route-summary">
         <div class="dir-endpoints"><strong>${leg.start_address.split(',')[0]}</strong> → <strong>${leg.end_address.split(',')[0]}</strong></div>
-        <div class="dir-stats">${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} mi</div>`;
+        <div class="dir-stats">${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} mi · ${getModeLabel()}</div>`;
     if (rd) {
         headerContent += `<div class="dir-safety ${rd.safetyLabel.cls}">${rd.safetyLabel.icon} ${rd.safetyLabel.text}</div>`;
         const daylight = getDaylightInfo(rd.weatherData);
@@ -753,18 +774,18 @@ function showWeatherChart(weatherData) {
         if (i === 0) tempPath += `M${x},${y}`;
         else tempPath += ` L${x},${y}`;
         const precipH = (wp.precipitationProb / 100) * chartH;
-        precipBars += `<rect x="${x - 8}" y="${chartH - precipH}" width="16" height="${precipH}" fill="#3b82f6" opacity="0.2" rx="2"/>`;
+        precipBars += `<rect x="${x - 8}" y="${chartH - precipH}" width="16" height="${precipH}" fill="#4285f4" opacity="0.2" rx="2"/>`;
     });
 
     let labels = '';
     valid.forEach((wp, i) => {
         const x = i * 60 + 30;
         const y = chartH - ((wp.temperature - minTemp) / range) * (chartH - 10) - 5;
-        labels += `<text x="${x}" y="${y - 6}" text-anchor="middle" font-size="10" fill="#1e293b" font-weight="600">${Math.round(wp.temperature)}°</text>`;
+        labels += `<text x="${x}" y="${y - 6}" text-anchor="middle" font-size="10" fill="#202124" font-weight="600">${Math.round(wp.temperature)}°</text>`;
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        labels += `<text x="${x}" y="${chartH + 12}" text-anchor="middle" font-size="9" fill="#94a3b8">${timeStr}</text>`;
+        labels += `<text x="${x}" y="${chartH + 12}" text-anchor="middle" font-size="9" fill="#9aa0a6">${timeStr}</text>`;
         if (wp.precipitationProb > 0) {
-            labels += `<text x="${x}" y="${chartH + 22}" text-anchor="middle" font-size="9" fill="#3b82f6">${wp.precipitationProb}%</text>`;
+            labels += `<text x="${x}" y="${chartH + 22}" text-anchor="middle" font-size="9" fill="#4285f4">${wp.precipitationProb}%</text>`;
         }
     });
 
@@ -777,11 +798,11 @@ function showWeatherChart(weatherData) {
 
     weatherChart.innerHTML = `<svg width="${w}" height="${chartH + 48}" viewBox="0 0 ${w} ${chartH + 48}">
         ${precipBars}
-        <path d="${tempPath}" fill="none" stroke="#ef4444" stroke-width="2"/>
+        <path d="${tempPath}" fill="none" stroke="#ea4335" stroke-width="2"/>
         ${valid.map((wp, i) => {
             const x = i * 60 + 30;
             const y = chartH - ((wp.temperature - minTemp) / range) * (chartH - 10) - 5;
-            return `<circle cx="${x}" cy="${y}" r="3" fill="#ef4444"/>`;
+            return `<circle cx="${x}" cy="${y}" r="3" fill="#ea4335"/>`;
         }).join('')}
         ${labels}
         ${iconLabels}
@@ -885,7 +906,11 @@ async function findBestDepartureTime() {
 
 function getRoute(origin, destination, waypoints) {
     return new Promise((resolve, reject) => {
-        const mode = google.maps.TravelMode[travelMode] || google.maps.TravelMode.DRIVING;
+        const mode = google.maps.TravelMode[travelMode];
+        if (!mode) {
+            reject(new Error('Invalid travel mode: ' + travelMode));
+            return;
+        }
         const req = {
             origin, destination,
             travelMode: mode,
@@ -972,11 +997,11 @@ async function getWeatherForWaypoints(waypoints) {
 }
 
 const weatherCategories = {
-    clear: { label: 'Clear', color: '#22c55e', icon: '☀️', codes: [0, 1] },
-    cloudy: { label: 'Cloudy', color: '#94a3b8', icon: '☁️', codes: [2, 3, 45, 48] },
-    rain: { label: 'Rain', color: '#3b82f6', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
+    clear: { label: 'Clear', color: '#34a853', icon: '☀️', codes: [0, 1] },
+    cloudy: { label: 'Cloudy', color: '#9aa0a6', icon: '☁️', codes: [2, 3, 45, 48] },
+    rain: { label: 'Rain', color: '#4285f4', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
     snow: { label: 'Snow', color: '#a855f7', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
-    storm: { label: 'Storm', color: '#ef4444', icon: '⚡', codes: [95, 96, 99] },
+    storm: { label: 'Storm', color: '#ea4335', icon: '⚡', codes: [95, 96, 99] },
 };
 
 function getWeatherCategory(code) {
@@ -995,7 +1020,7 @@ function buildWeatherBar(weatherData) {
     for (let i = 0; i < weatherData.length; i++) {
         const wp = weatherData[i];
         const cat = getWeatherCategory(wp.weatherCode);
-        const catInfo = cat === 'unknown' ? { color: '#e2e8f0', icon: '❓' } : weatherCategories[cat];
+        const catInfo = cat === 'unknown' ? { color: '#e8eaed', icon: '❓' } : weatherCategories[cat];
         const info = wp.noForecast ? { icon: '—' } : weatherCodeToInfo(wp.weatherCode);
         icons.push({ icon: info.icon, fraction: wp.fraction });
         if (i < weatherData.length - 1) segments.push({ width: (weatherData[i + 1].fraction - wp.fraction) * 100, color: catInfo.color });
@@ -1011,7 +1036,7 @@ function getStepTrafficSegments(route) {
     const totalDuration = leg.duration.value;
     const totalTraffic = leg.duration_in_traffic ? leg.duration_in_traffic.value : totalDuration;
     const ratio = totalTraffic / totalDuration;
-    const green = '#22c55e', orange = '#f59e0b', red = '#ef4444';
+    const green = '#34a853', orange = '#fbbc04', red = '#ea4335';
     if (!leg.duration_in_traffic || ratio <= 1.02) return { segments: [{ pct: 100, color: green }], label: 'Clear', labelColor: green };
     const delayMin = Math.round((totalTraffic - totalDuration) / 60);
     const raw = [];
@@ -1030,7 +1055,7 @@ function showOverlaysOnMap(weatherData) {
         const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const temp = wp.noForecast ? '?' : `${Math.round(wp.temperature)}°`;
         let detail;
-        if (wp.noForecast) detail = `<div class="overlay-detail"><strong>${wp.locationName}</strong><br>${timeStr} · ${dateStr}<br><span style="color:#94a3b8">No forecast</span></div>`;
+        if (wp.noForecast) detail = `<div class="overlay-detail"><strong>${wp.locationName}</strong><br>${timeStr} · ${dateStr}<br><span style="color:#9aa0a6">No forecast</span></div>`;
         else {
             const precip = wp.precipitationAmount > 0 ? `<br>Precip: ${wp.precipitationAmount.toFixed(2)}" · ${wp.precipitationProb}%` : (wp.precipitationProb > 0 ? `<br>${wp.precipitationProb}% chance of precip` : '');
             detail = `<div class="overlay-detail"><strong>${wp.locationName}</strong><br>${timeStr} · ${dateStr}<br>${info.desc}<br>Wind: ${Math.round(wp.windSpeed)} mph${precip}</div>`;
@@ -1046,15 +1071,15 @@ function showWeatherCards(weatherData) {
     weatherData.forEach(wp => {
         const info = wp.noForecast ? { icon: '—', desc: 'No forecast' } : weatherCodeToInfo(wp.weatherCode);
         const cat = getWeatherCategory(wp.weatherCode);
-        const catInfo = (cat !== 'unknown' && weatherCategories[cat]) ? weatherCategories[cat] : { color: '#94a3b8' };
-        const borderColor = wp.noForecast ? '#e2e8f0' : catInfo.color;
+        const catInfo = (cat !== 'unknown' && weatherCategories[cat]) ? weatherCategories[cat] : { color: '#9aa0a6' };
+        const borderColor = wp.noForecast ? '#e8eaed' : catInfo.color;
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const label = wp.isStart ? 'Start' : wp.isEnd ? 'End' : `${wp.distanceMiles} mi`;
         const card = document.createElement('div');
         card.className = 'weather-card';
         card.style.borderLeftColor = borderColor;
         if (wp.noForecast) {
-            card.innerHTML = `<div class="card-top"><div class="weather-icon" style="opacity:0.4">—</div><div class="card-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div></div><div class="temp" style="color:#94a3b8">N/A</div>`;
+            card.innerHTML = `<div class="card-top"><div class="weather-icon" style="opacity:0.4">—</div><div class="card-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div></div><div class="temp" style="color:#9aa0a6">N/A</div>`;
         } else {
             const precipText = wp.precipitationAmount > 0 ? `${wp.precipitationAmount.toFixed(2)}"` : `${wp.precipitationProb}%`;
             card.innerHTML = `<div class="card-top"><div class="weather-icon">${info.icon}</div><div class="card-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div></div><div class="card-weather-row"><span class="temp">${Math.round(wp.temperature)}°F</span><span class="description">${info.desc}</span></div><div class="extra">💨 ${Math.round(wp.windSpeed)} mph · 💧 ${precipText}</div>`;
@@ -1092,10 +1117,10 @@ function printTrip() {
     const route = currentDirectionsResult.routes[rd ? rd.routeIndex : 0];
     const leg = route.legs[0];
     const w = window.open('', '_blank');
-    w.document.write(`<html><head><title>Trip Summary</title><style>body{font-family:'Inter',Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px;color:#1e293b}h1{color:#3b82f6;font-size:20px}h2{font-size:16px;margin-top:24px;border-bottom:2px solid #f1f5f9;padding-bottom:6px;color:#0f172a}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{padding:8px 12px;text-align:left;border-bottom:1px solid #f1f5f9;font-size:13px}th{background:#f8fafc;font-weight:600}.safety{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;margin:6px 0}@media print{body{margin:0}}</style></head><body>`);
+    w.document.write(`<html><head><title>Trip Summary</title><style>body{font-family:'Inter',Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px;color:#202124}h1{color:#4285f4;font-size:20px}h2{font-size:16px;margin-top:24px;border-bottom:2px solid #e8eaed;padding-bottom:6px;color:#202124}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{padding:8px 12px;text-align:left;border-bottom:1px solid #e8eaed;font-size:13px}th{background:#f8f9fa;font-weight:600}.safety{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;margin:6px 0}@media print{body{margin:0}}</style></head><body>`);
     w.document.write(`<h1>🚗 Trip: ${leg.start_address} → ${leg.end_address}</h1>`);
     w.document.write(`<p>${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} miles via ${route.summary || 'route'}</p>`);
-    if (rd) w.document.write(`<p class="safety" style="background:#f0fdf4;color:#166534">${rd.safetyLabel.icon} ${rd.safetyLabel.text}</p>`);
+    if (rd) w.document.write(`<p class="safety" style="background:#e6f4ea;color:#137333">${rd.safetyLabel.icon} ${rd.safetyLabel.text}</p>`);
     w.document.write(`<h2>Weather Forecast</h2><table><tr><th>Time</th><th>Location</th><th>Weather</th><th>Temp</th><th>Wind</th><th>Precip</th></tr>`);
     currentWeatherData.filter(wp => !wp.noForecast).forEach(wp => {
         const info = weatherCodeToInfo(wp.weatherCode);
@@ -1111,7 +1136,7 @@ function printTrip() {
     }
     w.document.write(`<h2>Directions</h2><ol>`);
     leg.steps.forEach(step => w.document.write(`<li>${step.instructions} — ${step.distance ? step.distance.text : ''}</li>`));
-    w.document.write(`</ol><p style="color:#94a3b8;font-size:11px;margin-top:30px">Generated by Weather on the Road · ${new Date().toLocaleDateString()}</p></body></html>`);
+    w.document.write(`</ol><p style="color:#9aa0a6;font-size:11px;margin-top:30px">Generated by Weather on the Road · ${new Date().toLocaleDateString()}</p></body></html>`);
     w.document.close();
     w.print();
 }
@@ -1145,16 +1170,16 @@ function loadRecentSearches() {
 
 function getManeuverIcon(maneuver, instructions) {
     const text = (maneuver + ' ' + instructions).toLowerCase();
-    if (text.includes('uturn') || text.includes('u-turn')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M18 9v12h-2V9c0-2.21-1.79-4-4-4S8 6.79 8 9v4.17l1.59-1.59L11 13l-4 4-4-4 1.41-1.41L6 13.17V9c0-3.31 2.69-6 6-6s6 2.69 6 6z"/></svg>';
-    if (text.includes('sharp-left') || text.includes('sharp left')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M6 6.83L4.41 8.41 3 7l4-4 4 4-1.41 1.41L8 6.83V13h8c1.1 0 2 .9 2 2v6h-2v-6H8c-1.1 0-2-.9-2-2V6.83z"/></svg>';
-    if (text.includes('sharp-right') || text.includes('sharp right')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M18 6.83l-1.59 1.58L15 7l4-4 4 4-1.41 1.41L20 6.83V13h-8c-1.1 0-2 .9-2 2v6H8v-6c0-1.1-.9-2-2-2h8V6.83z"/></svg>';
-    if (text.includes('turn-left') || text.includes('turn left') || text.includes('left')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M14 7l-5 5 5 5V7zm7 10v2H3v-2h18z"/></svg>';
-    if (text.includes('turn-right') || text.includes('turn right') || text.includes('right')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M10 17l5-5-5-5v10zm-7 0v2h18v-2H3z"/></svg>';
-    if (text.includes('roundabout')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-13v2.17l-1.59-1.59L8 9l4 4 4-4-1.41-1.41L13 9.17V7h-2z"/></svg>';
-    if (text.includes('merge')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M17 4l-1.41 1.41L17.17 7H8c-2.76 0-5 2.24-5 5v5h2v-5c0-1.65 1.35-3 3-3h9.17l-1.58 1.59L17 12l4-4-4-4z"/></svg>';
-    if (text.includes('ramp') || text.includes('exit') || text.includes('off-ramp')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M18 6.83l1.59 1.58L21 7l-4-4-4 4 1.41 1.41L16 6.83V10c0 3.07-1.64 5.64-4 7.08V4h-2v13.08C7.64 15.64 6 13.07 6 10V6.83L7.59 8.41 9 7 5 3 1 7l1.41 1.41L4 6.83V10c0 3.72 2.01 6.94 5 8.72V21h6v-2.28c2.99-1.78 5-5 5-8.72V6.83z"/></svg>';
-    if (text.includes('fork')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M14 7l5 5-5 5V7zM3 17v2h18v-2H3zM10 7v10l-5-5 5-5z"/></svg>';
-    return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#64748b" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>';
+    if (text.includes('uturn') || text.includes('u-turn')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M18 9v12h-2V9c0-2.21-1.79-4-4-4S8 6.79 8 9v4.17l1.59-1.59L11 13l-4 4-4-4 1.41-1.41L6 13.17V9c0-3.31 2.69-6 6-6s6 2.69 6 6z"/></svg>';
+    if (text.includes('sharp-left') || text.includes('sharp left')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M6 6.83L4.41 8.41 3 7l4-4 4 4-1.41 1.41L8 6.83V13h8c1.1 0 2 .9 2 2v6h-2v-6H8c-1.1 0-2-.9-2-2V6.83z"/></svg>';
+    if (text.includes('sharp-right') || text.includes('sharp right')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M18 6.83l-1.59 1.58L15 7l4-4 4 4-1.41 1.41L20 6.83V13h-8c-1.1 0-2 .9-2 2v6H8v-6c0-1.1-.9-2-2-2h8V6.83z"/></svg>';
+    if (text.includes('turn-left') || text.includes('turn left') || text.includes('left')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M14 7l-5 5 5 5V7zm7 10v2H3v-2h18z"/></svg>';
+    if (text.includes('turn-right') || text.includes('turn right') || text.includes('right')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M10 17l5-5-5-5v10zm-7 0v2h18v-2H3z"/></svg>';
+    if (text.includes('roundabout')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-13v2.17l-1.59-1.59L8 9l4 4 4-4-1.41-1.41L13 9.17V7h-2z"/></svg>';
+    if (text.includes('merge')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M17 4l-1.41 1.41L17.17 7H8c-2.76 0-5 2.24-5 5v5h2v-5c0-1.65 1.35-3 3-3h9.17l-1.58 1.59L17 12l4-4-4-4z"/></svg>';
+    if (text.includes('ramp') || text.includes('exit') || text.includes('off-ramp')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M18 6.83l1.59 1.58L21 7l-4-4-4 4 1.41 1.41L16 6.83V10c0 3.07-1.64 5.64-4 7.08V4h-2v13.08C7.64 15.64 6 13.07 6 10V6.83L7.59 8.41 9 7 5 3 1 7l1.41 1.41L4 6.83V10c0 3.72 2.01 6.94 5 8.72V21h6v-2.28c2.99-1.78 5-5 5-8.72V6.83z"/></svg>';
+    if (text.includes('fork')) return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M14 7l5 5-5 5V7zM3 17v2h18v-2H3zM10 7v10l-5-5 5-5z"/></svg>';
+    return '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#5f6368" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>';
 }
 
 function initTimelineDrag() {
@@ -1173,6 +1198,217 @@ function formatDuration(seconds) {
     if (h === 0) return `${m} min`;
     if (m === 0) return `${h} hr`;
     return `${h} hr ${m} min`;
+}
+
+// ===== LIVE GPS NAVIGATION =====
+
+function startNavigation() {
+    if (!currentDirectionsResult || !currentRouteData) return;
+    if (!navigator.geolocation) { showError('Geolocation not supported by your browser.'); return; }
+
+    const selectedRouteEl = document.querySelector('.route-option.selected');
+    const selectedIdx = selectedRouteEl ? [...document.querySelectorAll('.route-option')].indexOf(selectedRouteEl) : 0;
+    const rd = currentRouteData[selectedIdx];
+    navRoute = currentDirectionsResult.routes[rd.routeIndex];
+
+    const allSteps = [];
+    for (const leg of navRoute.legs) {
+        for (const step of leg.steps) {
+            allSteps.push(step);
+        }
+    }
+    navSteps = allSteps;
+    navCurrentStep = 0;
+    navActive = true;
+
+    document.getElementById('side-panel').style.display = 'none';
+    weatherTimeline.classList.add('hidden');
+    document.getElementById('show-full-trip').classList.add('hidden');
+    navOverlay.classList.remove('hidden');
+
+    weatherOverlays.forEach(o => o.setMap(null));
+    routeInfoOverlays.forEach(o => o.setMap(null));
+    directionsRenderers.forEach(r => r.setMap(null));
+
+    navRenderer = new google.maps.DirectionsRenderer({
+        map,
+        directions: currentDirectionsResult,
+        routeIndex: rd.routeIndex,
+        suppressMarkers: true,
+        preserveViewport: true,
+        polylineOptions: { strokeColor: '#4285f4', strokeWeight: 6, strokeOpacity: 0.9, zIndex: 10 }
+    });
+
+    updateNavUI();
+
+    navWatchId = navigator.geolocation.watchPosition(
+        (pos) => onNavPositionUpdate(pos),
+        (err) => {
+            document.getElementById('nav-instruction').textContent = 'GPS signal lost. Trying to reconnect...';
+        },
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+    );
+
+    fetchNavWeather();
+}
+
+function stopNavigation() {
+    navActive = false;
+    if (navWatchId !== null) {
+        navigator.geolocation.clearWatch(navWatchId);
+        navWatchId = null;
+    }
+    if (navMarker) { navMarker.setMap(null); navMarker = null; }
+    if (navRenderer) { navRenderer.setMap(null); navRenderer = null; }
+
+    navOverlay.classList.add('hidden');
+    document.getElementById('nav-weather-strip').classList.add('hidden');
+    document.getElementById('side-panel').style.display = '';
+
+    if (currentDirectionsResult && currentRouteData) {
+        displayRoutes(currentDirectionsResult, currentRouteData, getDepartureTime());
+    }
+}
+
+function onNavPositionUpdate(pos) {
+    if (!navActive) return;
+    const userLat = pos.coords.latitude;
+    const userLng = pos.coords.longitude;
+    const userPos = new google.maps.LatLng(userLat, userLng);
+    const speedMph = pos.coords.speed ? Math.round(pos.coords.speed * 2.237) : 0;
+
+    if (!navMarker) {
+        navMarker = new google.maps.Marker({
+            position: userPos,
+            map,
+            icon: {
+                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                scale: 6,
+                fillColor: '#4285f4',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+                rotation: pos.coords.heading || 0
+            },
+            zIndex: 1000
+        });
+    } else {
+        navMarker.setPosition(userPos);
+        if (pos.coords.heading) {
+            navMarker.setIcon({
+                ...navMarker.getIcon(),
+                rotation: pos.coords.heading
+            });
+        }
+    }
+
+    map.panTo(userPos);
+    if (map.getZoom() < 15) map.setZoom(16);
+
+    advanceStep(userPos);
+
+    document.getElementById('nav-speed').textContent = speedMph + ' mph';
+
+    let remainDist = 0, remainTime = 0;
+    for (let i = navCurrentStep; i < navSteps.length; i++) {
+        remainDist += navSteps[i].distance ? navSteps[i].distance.value : 0;
+        remainTime += navSteps[i].duration ? navSteps[i].duration.value : 0;
+    }
+
+    const distToStepStart = google.maps.geometry
+        ? google.maps.geometry.spherical.computeDistanceBetween(userPos, navSteps[navCurrentStep].start_location)
+        : estimateDistance(userLat, userLng, navSteps[navCurrentStep].start_location.lat(), navSteps[navCurrentStep].start_location.lng());
+
+    const remainMiles = (remainDist / 1609.34).toFixed(1);
+    document.getElementById('nav-remaining-dist').textContent = remainMiles + ' mi';
+    document.getElementById('nav-remaining-time').textContent = formatDuration(remainTime);
+
+    const eta = new Date(Date.now() + remainTime * 1000);
+    document.getElementById('nav-eta').textContent = eta.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    updateNavUI();
+}
+
+function advanceStep(userPos) {
+    if (navCurrentStep >= navSteps.length - 1) {
+        document.getElementById('nav-instruction').textContent = 'You have arrived!';
+        document.getElementById('nav-distance-next').textContent = '🎉';
+        return;
+    }
+
+    const nextStepStart = navSteps[navCurrentStep + 1].start_location;
+    const dist = estimateDistance(
+        userPos.lat(), userPos.lng(),
+        nextStepStart.lat(), nextStepStart.lng()
+    );
+
+    if (dist < 30) {
+        navCurrentStep++;
+        if (navCurrentStep >= navSteps.length - 1) {
+            document.getElementById('nav-instruction').textContent = 'You have arrived!';
+            document.getElementById('nav-distance-next').textContent = '🎉';
+        }
+    }
+}
+
+function updateNavUI() {
+    if (navCurrentStep >= navSteps.length) return;
+    const step = navSteps[navCurrentStep];
+    const instrEl = document.getElementById('nav-instruction');
+    const distEl = document.getElementById('nav-distance-next');
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = step.instructions;
+    instrEl.textContent = tempDiv.textContent;
+
+    if (step.distance) {
+        distEl.textContent = step.distance.text;
+    }
+
+    const icon = getNavManeuverSVG(step.maneuver || '', step.instructions || '');
+    document.getElementById('nav-maneuver-icon').innerHTML = icon;
+}
+
+function getNavManeuverSVG(maneuver, instructions) {
+    const text = (maneuver + ' ' + instructions).toLowerCase();
+    if (text.includes('left')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M14 7l-5 5 5 5V7z"/></svg>';
+    if (text.includes('right')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M10 17l5-5-5-5v10z"/></svg>';
+    if (text.includes('uturn') || text.includes('u-turn')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M18 9v12h-2V9c0-2.21-1.79-4-4-4S8 6.79 8 9v4.17l1.59-1.59L11 13l-4 4-4-4 1.41-1.41L6 13.17V9c0-3.31 2.69-6 6-6s6 2.69 6 6z"/></svg>';
+    if (text.includes('roundabout')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>';
+    return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>';
+}
+
+function estimateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function fetchNavWeather() {
+    if (!navActive || !navRoute) return;
+    const leg = navRoute.legs[0];
+    const startLoc = leg.start_location;
+    try {
+        const dateStr = new Date().toISOString().split('T')[0];
+        const hour = new Date().getHours();
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${startLoc.lat()}&longitude=${startLoc.lng()}&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`);
+        const data = await res.json();
+        if (data.hourly && data.hourly.temperature_2m) {
+            const h = Math.min(hour, data.hourly.time.length - 1);
+            const temp = Math.round(data.hourly.temperature_2m[h]);
+            const code = data.hourly.weathercode[h];
+            const info = weatherCodeToInfo(code);
+            const strip = document.getElementById('nav-weather-strip');
+            document.getElementById('nav-weather-icon').textContent = info.icon;
+            document.getElementById('nav-weather-temp').textContent = temp + '°F';
+            document.getElementById('nav-weather-desc').textContent = info.desc;
+            strip.classList.remove('hidden');
+        }
+    } catch {}
 }
 
 function showError(msg) { errorMessage.textContent = msg; errorMessage.classList.remove('hidden'); }

@@ -14,9 +14,23 @@
         <div id="panel-header">
             <div class="brand">
                 <span class="brand-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4285f4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
                 </span>
                 <span class="brand-text">Weather on the Road</span>
+            </div>
+            <div class="travel-mode-row">
+                <button class="travel-mode-btn active" data-mode="DRIVING" title="Driving">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+                </button>
+                <button class="travel-mode-btn" data-mode="MOTORCYCLE" title="Motorcycle">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.44 9.03L15.41 5H11v2h3.59l2 2H5c-2.8 0-5 2.2-5 5s2.2 5 5 5c2.46 0 4.45-1.69 4.9-4h1.65l2.77-2.77c-.21.54-.32 1.14-.32 1.77 0 2.8 2.2 5 5 5s5-2.2 5-5c0-2.65-1.97-4.77-4.56-4.97zM7.82 15C7.4 16.15 6.28 17 5 17c-1.63 0-3-1.37-3-3s1.37-3 3-3c1.28 0 2.4.85 2.82 2H5v2h2.82zM19 17c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>
+                </button>
+                <button class="travel-mode-btn" data-mode="BICYCLING" title="Cycling">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.93 0-3.5-1.57-3.5-3.5S3.07 13.5 5 13.5s3.5 1.57 3.5 3.5S6.93 20.5 5 20.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5 2.1v-2c-1.4 0-2.5-.5-3.4-1.4L13.4 5.5c-.4-.4-1-.6-1.6-.6s-1.1.2-1.5.6L7.8 8c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 13.5V19h2v-6.5l-2.2-2.5zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
+                </button>
+                <button class="travel-mode-btn" data-mode="WALKING" title="Walking">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>
+                </button>
             </div>
         </div>
 
@@ -46,25 +60,6 @@
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
                         </button>
                     </div>
-                </div>
-
-                <div class="travel-mode-row">
-                    <button class="travel-mode-btn active" data-mode="DRIVING" title="Car">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
-                        <span>Car</span>
-                    </button>
-                    <button class="travel-mode-btn" data-mode="MOTORCYCLE" title="Motorcycle">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19.44 9.03L15.41 5H11v2h3.59l2 2H5c-2.8 0-5 2.2-5 5s2.2 5 5 5c2.46 0 4.45-1.69 4.9-4h1.65l2.77-2.77c-.21.54-.32 1.14-.32 1.77 0 2.8 2.2 5 5 5s5-2.2 5-5c0-2.65-1.97-4.77-4.56-4.97zM7.82 15C7.4 16.15 6.28 17 5 17c-1.63 0-3-1.37-3-3s1.37-3 3-3c1.28 0 2.4.85 2.82 2H5v2h2.82zM19 17c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>
-                        <span>Motorcycle</span>
-                    </button>
-                    <button class="travel-mode-btn" data-mode="BICYCLING" title="Bicycle">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.93 0-3.5-1.57-3.5-3.5S3.07 13.5 5 13.5s3.5 1.57 3.5 3.5S6.93 20.5 5 20.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5 2.1v-2c-1.4 0-2.5-.5-3.4-1.4L13.4 5.5c-.4-.4-1-.6-1.6-.6s-1.1.2-1.5.6L7.8 8c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 13.5V19h2v-6.5l-2.2-2.5zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
-                        <span>Bike</span>
-                    </button>
-                    <button class="travel-mode-btn" data-mode="WALKING" title="Walking">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>
-                        <span>Walk</span>
-                    </button>
                 </div>
 
                 <div class="departure-mode-row">
@@ -118,6 +113,10 @@
         </div>
 
         <div id="trip-actions" class="hidden">
+            <button id="start-nav-btn" class="action-btn nav-btn" title="Start navigation">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                Start
+            </button>
             <button id="share-trip-btn" class="action-btn" title="Share trip">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
                 Share
@@ -138,6 +137,49 @@
     <button id="show-full-trip" class="map-fab hidden" title="Show full trip">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15 3l2.3 2.3-2.89 2.87 1.42 1.42L18.7 6.7 21 9V3h-6zM3 9l2.3-2.3 2.87 2.89 1.42-1.42L6.7 5.3 9 3H3v6zm6 12l-2.3-2.3 2.89-2.87-1.42-1.42L5.3 17.3 3 15v6h6zm12-6l-2.3 2.3-2.87-2.89-1.42 1.42 2.89 2.87L15 21h6v-6z"/></svg>
     </button>
+
+    <div id="nav-overlay" class="hidden">
+        <div id="nav-top-bar">
+            <div id="nav-maneuver">
+                <div id="nav-maneuver-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="white"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                </div>
+                <div id="nav-maneuver-info">
+                    <div id="nav-distance-next">--</div>
+                    <div id="nav-instruction">Planning route...</div>
+                </div>
+            </div>
+        </div>
+        <div id="nav-bottom-bar">
+            <div id="nav-stats">
+                <div class="nav-stat">
+                    <span id="nav-eta" class="nav-stat-value">--</span>
+                    <span class="nav-stat-label">ETA</span>
+                </div>
+                <div class="nav-stat">
+                    <span id="nav-remaining-time" class="nav-stat-value">--</span>
+                    <span class="nav-stat-label">Remaining</span>
+                </div>
+                <div class="nav-stat">
+                    <span id="nav-remaining-dist" class="nav-stat-value">--</span>
+                    <span class="nav-stat-label">Distance</span>
+                </div>
+                <div class="nav-stat">
+                    <span id="nav-speed" class="nav-stat-value">--</span>
+                    <span class="nav-stat-label">Speed</span>
+                </div>
+            </div>
+            <button id="nav-stop-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M6 6h12v12H6z"/></svg>
+                Stop
+            </button>
+        </div>
+        <div id="nav-weather-strip" class="hidden">
+            <span id="nav-weather-icon">--</span>
+            <span id="nav-weather-temp">--</span>
+            <span id="nav-weather-desc">--</span>
+        </div>
+    </div>
 
     <div id="weather-timeline" class="hidden">
         <div id="timeline-header">
