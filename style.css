@@ -50,6 +50,7 @@ html, body {
     align-items: center;
     gap: 8px;
     margin-bottom: 10px;
+    flex-wrap: wrap;
 }
 
 .brand-icon {
@@ -58,9 +59,13 @@ html, body {
     justify-content: center;
     width: 32px;
     height: 32px;
-    background: #e8f0fe;
-    border-radius: 8px;
     flex-shrink: 0;
+}
+
+.brand-icon img {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
 }
 
 .brand-text {
@@ -68,6 +73,16 @@ html, body {
     font-weight: 700;
     color: #202124;
     letter-spacing: -0.2px;
+}
+
+.brand-tagline {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    width: 100%;
+    padding-left: 40px;
+    margin-top: -6px;
 }
 
 /* --- Travel Mode Tabs (Google Maps style) --- */
