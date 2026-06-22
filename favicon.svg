@@ -1,32 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Road -->
-  <path d="M13 30L15 12L17 2" stroke="#475569" stroke-width="5" stroke-linecap="round" fill="none"/>
-  <path d="M13 30L15 12L17 2" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="M13.2 28L14.6 16L15.4 10L16 6" stroke="#fff" stroke-width="0.8" stroke-dasharray="2 2" stroke-linecap="round" fill="none"/>
-  <!-- Location pin at start -->
-  <circle cx="13" cy="30" r="2" fill="#ef4444"/>
-  <circle cx="13" cy="30" r="0.8" fill="#fff"/>
-  <!-- Location pin at end -->
-  <path d="M17 2a3 3 0 0 0-3 3c0 2.5 3 4.5 3 4.5s3-2 3-4.5a3 3 0 0 0-3-3z" fill="#3b82f6"/>
-  <circle cx="17" cy="5" r="1.2" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Blue rounded square background -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#1e3a8a"/>
+  <!-- Lighter blue right section (rain area) -->
+  <path d="M38 2H48a14 14 0 0 1 14 14v34a14 14 0 0 1-14 14H38C50 52 54 40 48 28c-4-8-10-16-10-26z" fill="#1e40af" opacity="0.6"/>
+
   <!-- Sun -->
-  <circle cx="26" cy="8" r="4" fill="#facc15"/>
-  <g stroke="#facc15" stroke-width="1.2" stroke-linecap="round">
-    <line x1="26" y1="2" x2="26" y2="3.2"/>
-    <line x1="26" y1="12.8" x2="26" y2="14"/>
-    <line x1="20" y1="8" x2="21.2" y2="8"/>
-    <line x1="30.8" y1="8" x2="32" y2="8"/>
-    <line x1="21.8" y1="3.8" x2="22.6" y2="4.6"/>
-    <line x1="29.4" y1="11.4" x2="30.2" y2="12.2"/>
-    <line x1="29.4" y1="4.6" x2="30.2" y2="3.8"/>
-    <line x1="21.8" y1="12.2" x2="22.6" y2="11.4"/>
+  <circle cx="18" cy="14" r="5.5" fill="#f59e0b"/>
+  <g stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round">
+    <line x1="18" y1="6" x2="18" y2="8"/>
+    <line x1="18" y1="20" x2="18" y2="22"/>
+    <line x1="10" y1="14" x2="12" y2="14"/>
+    <line x1="24" y1="14" x2="26" y2="14"/>
+    <line x1="12.3" y1="8.3" x2="13.7" y2="9.7"/>
+    <line x1="22.3" y1="18.3" x2="23.7" y2="19.7"/>
+    <line x1="22.3" y1="9.7" x2="23.7" y2="8.3"/>
+    <line x1="12.3" y1="19.7" x2="13.7" y2="18.3"/>
   </g>
-  <!-- Cloud -->
-  <ellipse cx="7" cy="16" rx="5" ry="3.5" fill="#e2e8f0"/>
-  <ellipse cx="4.5" cy="17.5" rx="3.5" ry="2.5" fill="#e2e8f0"/>
-  <ellipse cx="9.5" cy="17.5" rx="3" ry="2.5" fill="#e2e8f0"/>
+
+  <!-- White cloud -->
+  <ellipse cx="28" cy="18" rx="10" ry="6" fill="#fff"/>
+  <ellipse cx="22" cy="21" rx="7" ry="5" fill="#fff"/>
+  <ellipse cx="34" cy="21" rx="6" ry="5" fill="#fff"/>
+
+  <!-- Dark rain cloud -->
+  <ellipse cx="48" cy="16" rx="8" ry="5" fill="#60a5fa" opacity="0.7"/>
+  <ellipse cx="44" cy="19" rx="6" ry="4" fill="#60a5fa" opacity="0.7"/>
+  <ellipse cx="52" cy="19" rx="5" ry="4" fill="#60a5fa" opacity="0.7"/>
+
   <!-- Rain drops -->
-  <line x1="4" y1="20.5" x2="3.5" y2="22.5" stroke="#3b82f6" stroke-width="1" stroke-linecap="round"/>
-  <line x1="7" y1="20.5" x2="6.5" y2="22.5" stroke="#3b82f6" stroke-width="1" stroke-linecap="round"/>
-  <line x1="10" y1="20.5" x2="9.5" y2="22.5" stroke="#3b82f6" stroke-width="1" stroke-linecap="round"/>
+  <g stroke="#93c5fd" stroke-width="1.2" stroke-linecap="round" opacity="0.8">
+    <line x1="43" y1="24" x2="41" y2="28"/>
+    <line x1="47" y1="25" x2="45" y2="29"/>
+    <line x1="51" y1="24" x2="49" y2="28"/>
+    <line x1="45" y1="30" x2="43" y2="34"/>
+    <line x1="49" y1="31" x2="47" y2="35"/>
+    <line x1="53" y1="30" x2="51" y2="34"/>
+  </g>
+
+  <!-- Curving road -->
+  <path d="M8 58 C12 42, 18 36, 22 30 C26 24, 30 22, 36 28 C42 34, 44 44, 50 48" stroke="#1e293b" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M8 58 C12 42, 18 36, 22 30 C26 24, 30 22, 36 28 C42 34, 44 44, 50 48" stroke="#334155" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <!-- Road white edge lines -->
+  <path d="M5.5 58.5 C9.5 42.5, 15.5 36.5, 19.5 30.5 C23.5 24.5, 27.5 22.5, 33.5 28.5 C39.5 34.5, 41.5 44.5, 47.5 48.5" stroke="#fff" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  <path d="M10.5 57.5 C14.5 41.5, 20.5 35.5, 24.5 29.5 C28.5 23.5, 32.5 21.5, 38.5 27.5 C44.5 33.5, 46.5 43.5, 52.5 47.5" stroke="#fff" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  <!-- Road dashes -->
+  <path d="M8 58 C12 42, 18 36, 22 30 C26 24, 30 22, 36 28 C42 34, 44 44, 50 48" stroke="#fff" stroke-width="1" fill="none" stroke-dasharray="3 3" stroke-linecap="round"/>
+
+  <!-- Location pin -->
+  <path d="M48 44a5 5 0 0 0-5 5c0 4 5 7 5 7s5-3 5-7a5 5 0 0 0-5-5z" fill="#fff"/>
+  <circle cx="48" cy="49" r="2" fill="#3b82f6"/>
 </svg>
