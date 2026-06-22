@@ -1158,6 +1158,16 @@ html, body {
     overflow: hidden;
 }
 
+#nav-road-name {
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    margin-top: 2px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 #nav-next-step {
     display: flex;
     align-items: center;
@@ -1337,7 +1347,7 @@ html, body {
     position: absolute;
     top: auto;
     bottom: 140px;
-    left: 16px;
+    left: 90px;
     right: auto;
     background: rgba(255,255,255,0.97);
     border-radius: 12px;
@@ -1533,6 +1543,94 @@ html, body {
     color: #202124 !important;
 }
 
+/* Speedometer (Waze-style) */
+#nav-speedometer {
+    position: absolute;
+    left: 16px;
+    bottom: 200px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    z-index: 51;
+}
+
+#nav-speedo-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #202124;
+    line-height: 1;
+}
+
+#nav-speedo-unit {
+    font-size: 9px;
+    font-weight: 600;
+    color: #5f6368;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Weather alert banner (rain prediction) */
+#nav-weather-alert {
+    position: absolute;
+    top: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 200px;
+    background: rgba(26, 115, 232, 0.95);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 2px 12px rgba(26, 115, 232, 0.4);
+    pointer-events: auto;
+    z-index: 52;
+    animation: weatherAlertSlide 0.4s ease-out;
+    white-space: nowrap;
+}
+
+#nav-weather-alert.hidden { display: none; }
+
+#nav-weather-alert.alert-rain { background: rgba(66, 133, 244, 0.95); }
+#nav-weather-alert.alert-snow { background: rgba(168, 85, 247, 0.95); box-shadow: 0 2px 12px rgba(168, 85, 247, 0.4); }
+#nav-weather-alert.alert-storm { background: rgba(234, 67, 53, 0.95); box-shadow: 0 2px 12px rgba(234, 67, 53, 0.4); }
+#nav-weather-alert.alert-clear { background: rgba(52, 168, 83, 0.95); box-shadow: 0 2px 12px rgba(52, 168, 83, 0.4); }
+
+#nav-weather-alert-icon { font-size: 20px; }
+
+@keyframes weatherAlertSlide {
+    0% { transform: translateX(-50%) translateY(20px); opacity: 0; }
+    100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+/* Mute button */
+#nav-mute-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid #e8eaed;
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+#nav-mute-btn:hover { background: #f1f3f4; }
+#nav-mute-btn.muted { background: #fce8e6; border-color: #f5c6c2; }
+#nav-mute-btn.muted svg { fill: #ea4335; }
+
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
     #side-panel {
@@ -1559,6 +1657,9 @@ html, body {
     #nav-top-bar { padding: 12px 16px; }
     #nav-distance-next { font-size: 22px; }
     #nav-bottom-bar { margin: 0 6px 6px; }
+    #nav-speedometer { width: 52px; height: 52px; bottom: 160px; left: 10px; }
+    #nav-speedo-value { font-size: 18px; }
+    #nav-weather-alert { font-size: 12px; padding: 8px 14px; bottom: 160px; }
 
     html, body { overflow: auto; }
 }

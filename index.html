@@ -148,6 +148,7 @@
                 <div id="nav-maneuver-info">
                     <div id="nav-distance-next">--</div>
                     <div id="nav-instruction">Planning route...</div>
+                    <div id="nav-road-name"></div>
                 </div>
             </div>
             <div id="nav-next-step" class="hidden">
@@ -155,9 +156,17 @@
                 <span id="nav-next-text">Then...</span>
             </div>
         </div>
+        <div id="nav-weather-alert" class="hidden">
+            <span id="nav-weather-alert-icon"></span>
+            <span id="nav-weather-alert-text"></span>
+        </div>
         <div id="nav-alert" class="hidden">
             <span id="nav-alert-icon"></span>
             <span id="nav-alert-text"></span>
+        </div>
+        <div id="nav-speedometer">
+            <span id="nav-speedo-value">0</span>
+            <span id="nav-speedo-unit">mph</span>
         </div>
         <div id="nav-bottom-bar">
             <div id="nav-stats">
@@ -175,15 +184,13 @@
                     <span id="nav-remaining-dist" class="nav-stat-value">--</span>
                     <span class="nav-stat-label">Distance</span>
                 </div>
-                <div class="nav-stat-separator"></div>
-                <div class="nav-stat">
-                    <span id="nav-speed" class="nav-stat-value">--</span>
-                    <span class="nav-stat-label">Speed</span>
-                </div>
             </div>
             <div id="nav-bottom-actions">
                 <button id="nav-steps-btn" title="View all steps">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="#3c4043"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+                </button>
+                <button id="nav-mute-btn" title="Mute alerts">
+                    <svg id="nav-mute-icon" width="20" height="20" viewBox="0 0 24 24" fill="#3c4043"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                 </button>
                 <button id="nav-stop-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M6 6h12v12H6z"/></svg>

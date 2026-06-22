@@ -64,6 +64,10 @@ let navAlertTimeout = null;
 let navLastAlertStep = -1;
 let navLastHeading = 0;
 let navUserDragged = false;
+let navRadarWasOn = false;
+let navMuted = false;
+let navWeatherAlertTimeout = null;
+let navAudioCtx = null;
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -1244,6 +1248,10 @@ function startNavigation() {
     document.getElementById('nav-steps-drawer').classList.add('hidden');
     document.getElementById('nav-recenter-btn').classList.add('hidden');
     document.getElementById('nav-progress-fill').style.width = '0%';
+    document.getElementById('nav-weather-alert').classList.add('hidden');
+
+    navRadarWasOn = !!radarLayer;
+    if (!radarLayer) enableRadar();
 
     weatherOverlays.forEach(o => o.setMap(null));
     routeInfoOverlays.forEach(o => o.setMap(null));
@@ -1285,6 +1293,19 @@ function startNavigation() {
     });
     document.getElementById('nav-recenter-btn').addEventListener('click', navRecenter);
     document.getElementById('nav-arrived-close').addEventListener('click', stopNavigation);
+
+    const muteBtn = document.getElementById('nav-mute-btn');
+    navMuted = false;
+    muteBtn.classList.remove('muted');
+    muteBtn.onclick = () => {
+        navMuted = !navMuted;
+        muteBtn.classList.toggle('muted', navMuted);
+        muteBtn.querySelector('svg').innerHTML = navMuted
+            ? '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>'
+            : '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+    };
+
+    try { navAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
 }
 
 function onNavMapDrag() {
@@ -1331,10 +1352,15 @@ function stopNavigation() {
     if (navRenderer) { navRenderer.setMap(null); navRenderer = null; }
     if (navWeatherInterval) { clearInterval(navWeatherInterval); navWeatherInterval = null; }
     if (navAlertTimeout) { clearTimeout(navAlertTimeout); navAlertTimeout = null; }
+    if (navWeatherAlertTimeout) { clearTimeout(navWeatherAlertTimeout); navWeatherAlertTimeout = null; }
     releaseWakeLock();
+
+    if (!navRadarWasOn) disableRadar();
+    document.getElementById('toggle-radar').checked = !!radarLayer;
 
     navOverlay.classList.add('hidden');
     document.getElementById('nav-weather-strip').classList.add('hidden');
+    document.getElementById('nav-weather-alert').classList.add('hidden');
     document.getElementById('nav-steps-drawer').classList.add('hidden');
     document.getElementById('nav-arrived').classList.add('hidden');
     document.getElementById('side-panel').style.display = '';
@@ -1397,7 +1423,7 @@ function onNavPositionUpdate(pos) {
     advanceStep(userPos);
     checkOffRoute(userPos);
 
-    document.getElementById('nav-speed').textContent = speedMph + ' mph';
+    document.getElementById('nav-speedo-value').textContent = speedMph;
 
     let remainDist = 0, remainTime = 0;
     for (let i = navCurrentStep; i < navSteps.length; i++) {
@@ -1469,10 +1495,31 @@ function showTurnAlert(step) {
     document.getElementById('nav-alert-text').textContent = cleanText.length > 40 ? cleanText.substring(0, 40) + '...' : cleanText;
     alertEl.classList.remove('hidden');
 
+    if (!navMuted) {
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        playNavBeep();
+    }
+
     if (navAlertTimeout) clearTimeout(navAlertTimeout);
     navAlertTimeout = setTimeout(() => {
         alertEl.classList.add('hidden');
     }, 3000);
+}
+
+function playNavBeep() {
+    if (!navAudioCtx || navMuted) return;
+    try {
+        const osc = navAudioCtx.createOscillator();
+        const gain = navAudioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(navAudioCtx.destination);
+        osc.frequency.value = 880;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, navAudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, navAudioCtx.currentTime + 0.3);
+        osc.start(navAudioCtx.currentTime);
+        osc.stop(navAudioCtx.currentTime + 0.3);
+    } catch {}
 }
 
 function advanceStep(userPos) {
@@ -1587,6 +1634,9 @@ function updateNavUI() {
     tempDiv.innerHTML = step.instructions;
     instrEl.textContent = tempDiv.textContent;
 
+    const roadName = extractRoadName(step.instructions);
+    document.getElementById('nav-road-name').textContent = roadName;
+
     const icon = getNavManeuverSVG(step.maneuver || '', step.instructions || '');
     document.getElementById('nav-maneuver-icon').innerHTML = icon;
 
@@ -1663,14 +1713,28 @@ function estimateDistance(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function extractRoadName(instructions) {
+    if (!instructions) return '';
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = instructions;
+    const bTags = tempDiv.querySelectorAll('b');
+    if (bTags.length > 0) {
+        const last = bTags[bTags.length - 1].textContent;
+        if (last && last.length > 1) return last;
+    }
+    return '';
+}
+
 async function fetchNavWeather() {
     if (!navActive) return;
     const loc = navMarker ? navMarker.getPosition() : (navRoute ? navRoute.legs[0].start_location : null);
     if (!loc) return;
     try {
-        const dateStr = new Date().toISOString().split('T')[0];
-        const hour = new Date().getHours();
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat()}&longitude=${loc.lng()}&hourly=temperature_2m,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`);
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const tomorrow = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
+        const hour = now.getHours();
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat()}&longitude=${loc.lng()}&hourly=temperature_2m,weathercode,windspeed_10m,precipitation_probability,precipitation&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&start_date=${dateStr}&end_date=${tomorrow}`);
         const data = await res.json();
         if (data.hourly && data.hourly.temperature_2m) {
             const h = Math.min(hour, data.hourly.time.length - 1);
@@ -1684,8 +1748,101 @@ async function fetchNavWeather() {
             document.getElementById('nav-weather-desc').textContent = info.desc;
             document.getElementById('nav-weather-wind').textContent = wind ? `💨 ${wind} mph` : '';
             strip.classList.remove('hidden');
+
+            showWeatherPrediction(data.hourly, hour, code);
         }
     } catch {}
+}
+
+function showWeatherPrediction(hourly, currentHour, currentCode) {
+    const alertEl = document.getElementById('nav-weather-alert');
+    const iconEl = document.getElementById('nav-weather-alert-icon');
+    const textEl = document.getElementById('nav-weather-alert-text');
+
+    const rainCodes = [51, 53, 55, 61, 63, 65, 80, 81, 82];
+    const snowCodes = [66, 67, 71, 73, 75, 77, 85, 86];
+    const stormCodes = [95, 96, 99];
+    const precipCodes = [...rainCodes, ...snowCodes, ...stormCodes];
+
+    const currentIsRaining = precipCodes.includes(currentCode);
+    const lookAheadHours = 6;
+
+    if (currentIsRaining) {
+        let clearInHours = null;
+        for (let i = currentHour + 1; i < Math.min(currentHour + lookAheadHours, hourly.weathercode.length); i++) {
+            if (!precipCodes.includes(hourly.weathercode[i])) {
+                clearInHours = i - currentHour;
+                break;
+            }
+        }
+
+        const cat = stormCodes.includes(currentCode) ? 'storm' : snowCodes.includes(currentCode) ? 'snow' : 'rain';
+        alertEl.className = 'alert-' + cat;
+
+        if (clearInHours) {
+            const mins = clearInHours * 60;
+            iconEl.textContent = cat === 'storm' ? '⚡' : cat === 'snow' ? '🌨️' : '🌧️';
+            textEl.textContent = mins <= 60
+                ? `${cat === 'storm' ? 'Storm' : cat === 'snow' ? 'Snow' : 'Rain'} clearing in ~${mins} min`
+                : `${cat === 'storm' ? 'Storm' : cat === 'snow' ? 'Snow' : 'Rain'} clearing in ~${clearInHours} hr`;
+        } else {
+            iconEl.textContent = cat === 'storm' ? '⚡' : cat === 'snow' ? '🌨️' : '🌧️';
+            textEl.textContent = `${cat === 'storm' ? 'Storm' : cat === 'snow' ? 'Snow' : 'Rain'} continuing`;
+        }
+        alertEl.classList.remove('hidden');
+    } else {
+        let precipStartHour = null;
+        let precipType = 'rain';
+        for (let i = currentHour + 1; i < Math.min(currentHour + lookAheadHours, hourly.weathercode.length); i++) {
+            const fc = hourly.weathercode[i];
+            if (precipCodes.includes(fc)) {
+                precipStartHour = i;
+                precipType = stormCodes.includes(fc) ? 'storm' : snowCodes.includes(fc) ? 'snow' : 'rain';
+                break;
+            }
+        }
+
+        if (precipStartHour) {
+            const minsUntil = (precipStartHour - currentHour) * 60;
+            alertEl.className = 'alert-' + precipType;
+
+            iconEl.textContent = precipType === 'storm' ? '⚡' : precipType === 'snow' ? '🌨️' : '🌧️';
+            textEl.textContent = minsUntil <= 60
+                ? `${precipType === 'storm' ? 'Storm' : precipType === 'snow' ? 'Snow' : 'Rain'} starting in ~${minsUntil} min`
+                : `${precipType === 'storm' ? 'Storm' : precipType === 'snow' ? 'Snow' : 'Rain'} in ~${Math.round(minsUntil / 60)} hr`;
+            alertEl.classList.remove('hidden');
+        } else {
+            const highPrecipProb = hourly.precipitation_probability;
+            if (highPrecipProb) {
+                let highProbHour = null;
+                for (let i = currentHour + 1; i < Math.min(currentHour + lookAheadHours, highPrecipProb.length); i++) {
+                    if (highPrecipProb[i] >= 60) { highProbHour = i; break; }
+                }
+                if (highProbHour) {
+                    const minsUntil = (highProbHour - currentHour) * 60;
+                    alertEl.className = 'alert-rain';
+                    iconEl.textContent = '🌦️';
+                    textEl.textContent = minsUntil <= 60
+                        ? `${highPrecipProb[highProbHour]}% chance of rain in ~${minsUntil} min`
+                        : `${highPrecipProb[highProbHour]}% chance of rain in ~${Math.round(minsUntil / 60)} hr`;
+                    alertEl.classList.remove('hidden');
+                } else {
+                    alertEl.className = 'alert-clear';
+                    iconEl.textContent = '☀️';
+                    textEl.textContent = 'Clear weather ahead';
+                    alertEl.classList.remove('hidden');
+                    if (navWeatherAlertTimeout) clearTimeout(navWeatherAlertTimeout);
+                    navWeatherAlertTimeout = setTimeout(() => alertEl.classList.add('hidden'), 8000);
+                    return;
+                }
+            } else {
+                alertEl.classList.add('hidden');
+            }
+        }
+    }
+
+    if (navWeatherAlertTimeout) clearTimeout(navWeatherAlertTimeout);
+    navWeatherAlertTimeout = setTimeout(() => alertEl.classList.add('hidden'), 15000);
 }
 
 function showError(msg) { errorMessage.textContent = msg; errorMessage.classList.remove('hidden'); }
