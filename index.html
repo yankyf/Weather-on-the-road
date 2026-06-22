@@ -140,44 +140,81 @@
 
     <div id="nav-overlay" class="hidden">
         <div id="nav-top-bar">
+            <div id="nav-progress-bar"><div id="nav-progress-fill"></div></div>
             <div id="nav-maneuver">
                 <div id="nav-maneuver-icon">
-                    <svg viewBox="0 0 24 24" width="32" height="32" fill="white"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    <svg viewBox="0 0 24 24" width="36" height="36" fill="white"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
                 </div>
                 <div id="nav-maneuver-info">
                     <div id="nav-distance-next">--</div>
                     <div id="nav-instruction">Planning route...</div>
                 </div>
             </div>
+            <div id="nav-next-step" class="hidden">
+                <span id="nav-next-icon"></span>
+                <span id="nav-next-text">Then...</span>
+            </div>
+        </div>
+        <div id="nav-alert" class="hidden">
+            <span id="nav-alert-icon"></span>
+            <span id="nav-alert-text"></span>
         </div>
         <div id="nav-bottom-bar">
             <div id="nav-stats">
-                <div class="nav-stat">
+                <div class="nav-stat nav-stat-eta">
                     <span id="nav-eta" class="nav-stat-value">--</span>
                     <span class="nav-stat-label">ETA</span>
                 </div>
+                <div class="nav-stat-separator"></div>
                 <div class="nav-stat">
                     <span id="nav-remaining-time" class="nav-stat-value">--</span>
                     <span class="nav-stat-label">Remaining</span>
                 </div>
+                <div class="nav-stat-separator"></div>
                 <div class="nav-stat">
                     <span id="nav-remaining-dist" class="nav-stat-value">--</span>
                     <span class="nav-stat-label">Distance</span>
                 </div>
+                <div class="nav-stat-separator"></div>
                 <div class="nav-stat">
                     <span id="nav-speed" class="nav-stat-value">--</span>
                     <span class="nav-stat-label">Speed</span>
                 </div>
             </div>
-            <button id="nav-stop-btn">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M6 6h12v12H6z"/></svg>
-                Stop
-            </button>
+            <div id="nav-bottom-actions">
+                <button id="nav-steps-btn" title="View all steps">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#3c4043"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+                </button>
+                <button id="nav-stop-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M6 6h12v12H6z"/></svg>
+                    Stop
+                </button>
+            </div>
         </div>
+        <button id="nav-recenter-btn" class="hidden" title="Recenter">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#4285f4"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+        </button>
         <div id="nav-weather-strip" class="hidden">
             <span id="nav-weather-icon">--</span>
             <span id="nav-weather-temp">--</span>
             <span id="nav-weather-desc">--</span>
+            <span id="nav-weather-wind"></span>
+        </div>
+        <div id="nav-steps-drawer" class="hidden">
+            <div id="nav-steps-drawer-header">
+                <span>Upcoming Steps</span>
+                <button id="nav-steps-close">&times;</button>
+            </div>
+            <div id="nav-steps-list"></div>
+        </div>
+        <div id="nav-arrived" class="hidden">
+            <div id="nav-arrived-content">
+                <div id="nav-arrived-icon">🎉</div>
+                <div id="nav-arrived-title">You have arrived!</div>
+                <div id="nav-arrived-address"></div>
+                <div id="nav-arrived-stats"></div>
+                <button id="nav-arrived-close">Done</button>
+            </div>
         </div>
     </div>
 

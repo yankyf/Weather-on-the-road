@@ -55,6 +55,15 @@ let navSteps = [];
 let navCurrentStep = 0;
 let navMarker = null;
 let navRenderer = null;
+let navFollowing = true;
+let navTotalDist = 0;
+let navStartTime = null;
+let navWakeLock = null;
+let navWeatherInterval = null;
+let navAlertTimeout = null;
+let navLastAlertStep = -1;
+let navLastHeading = 0;
+let navUserDragged = false;
 
 const now = new Date();
 departureDateInput.value = now.toISOString().split('T')[0];
@@ -1212,19 +1221,29 @@ function startNavigation() {
     navRoute = currentDirectionsResult.routes[rd.routeIndex];
 
     const allSteps = [];
+    navTotalDist = 0;
     for (const leg of navRoute.legs) {
         for (const step of leg.steps) {
             allSteps.push(step);
+            navTotalDist += step.distance ? step.distance.value : 0;
         }
     }
     navSteps = allSteps;
     navCurrentStep = 0;
     navActive = true;
+    navFollowing = true;
+    navStartTime = Date.now();
+    navLastAlertStep = -1;
+    navUserDragged = false;
 
     document.getElementById('side-panel').style.display = 'none';
     weatherTimeline.classList.add('hidden');
     document.getElementById('show-full-trip').classList.add('hidden');
     navOverlay.classList.remove('hidden');
+    document.getElementById('nav-arrived').classList.add('hidden');
+    document.getElementById('nav-steps-drawer').classList.add('hidden');
+    document.getElementById('nav-recenter-btn').classList.add('hidden');
+    document.getElementById('nav-progress-fill').style.width = '0%';
 
     weatherOverlays.forEach(o => o.setMap(null));
     routeInfoOverlays.forEach(o => o.setMap(null));
@@ -1236,20 +1255,70 @@ function startNavigation() {
         routeIndex: rd.routeIndex,
         suppressMarkers: true,
         preserveViewport: true,
-        polylineOptions: { strokeColor: '#4285f4', strokeWeight: 6, strokeOpacity: 0.9, zIndex: 10 }
+        polylineOptions: { strokeColor: '#4285f4', strokeWeight: 7, strokeOpacity: 0.85, zIndex: 10 }
     });
 
+    map.setZoom(17);
+    map.setTilt(45);
+
+    map.addListener('dragstart', onNavMapDrag);
+
     updateNavUI();
+    buildNavStepsList();
 
     navWatchId = navigator.geolocation.watchPosition(
         (pos) => onNavPositionUpdate(pos),
-        (err) => {
+        () => {
             document.getElementById('nav-instruction').textContent = 'GPS signal lost. Trying to reconnect...';
         },
-        { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 8000 }
     );
 
     fetchNavWeather();
+    navWeatherInterval = setInterval(() => fetchNavWeather(), 120000);
+
+    acquireWakeLock();
+
+    document.getElementById('nav-steps-btn').addEventListener('click', toggleNavStepsDrawer);
+    document.getElementById('nav-steps-close').addEventListener('click', () => {
+        document.getElementById('nav-steps-drawer').classList.add('hidden');
+    });
+    document.getElementById('nav-recenter-btn').addEventListener('click', navRecenter);
+    document.getElementById('nav-arrived-close').addEventListener('click', stopNavigation);
+}
+
+function onNavMapDrag() {
+    if (!navActive) return;
+    navFollowing = false;
+    navUserDragged = true;
+    document.getElementById('nav-recenter-btn').classList.remove('hidden');
+}
+
+function navRecenter() {
+    navFollowing = true;
+    navUserDragged = false;
+    document.getElementById('nav-recenter-btn').classList.add('hidden');
+    if (navMarker) {
+        map.panTo(navMarker.getPosition());
+        map.setZoom(17);
+        map.setTilt(45);
+        if (navLastHeading) map.setHeading(navLastHeading);
+    }
+}
+
+async function acquireWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            navWakeLock = await navigator.wakeLock.request('screen');
+        }
+    } catch {}
+}
+
+function releaseWakeLock() {
+    if (navWakeLock) {
+        navWakeLock.release().catch(() => {});
+        navWakeLock = null;
+    }
 }
 
 function stopNavigation() {
@@ -1260,10 +1329,18 @@ function stopNavigation() {
     }
     if (navMarker) { navMarker.setMap(null); navMarker = null; }
     if (navRenderer) { navRenderer.setMap(null); navRenderer = null; }
+    if (navWeatherInterval) { clearInterval(navWeatherInterval); navWeatherInterval = null; }
+    if (navAlertTimeout) { clearTimeout(navAlertTimeout); navAlertTimeout = null; }
+    releaseWakeLock();
 
     navOverlay.classList.add('hidden');
     document.getElementById('nav-weather-strip').classList.add('hidden');
+    document.getElementById('nav-steps-drawer').classList.add('hidden');
+    document.getElementById('nav-arrived').classList.add('hidden');
     document.getElementById('side-panel').style.display = '';
+
+    map.setTilt(0);
+    map.setHeading(0);
 
     if (currentDirectionsResult && currentRouteData) {
         displayRoutes(currentDirectionsResult, currentRouteData, getDepartureTime());
@@ -1275,7 +1352,12 @@ function onNavPositionUpdate(pos) {
     const userLat = pos.coords.latitude;
     const userLng = pos.coords.longitude;
     const userPos = new google.maps.LatLng(userLat, userLng);
-    const speedMph = pos.coords.speed ? Math.round(pos.coords.speed * 2.237) : 0;
+    const speedMph = pos.coords.speed != null && pos.coords.speed >= 0 ? Math.round(pos.coords.speed * 2.237) : 0;
+    const heading = pos.coords.heading;
+
+    if (heading != null && !isNaN(heading)) {
+        navLastHeading = heading;
+    }
 
     if (!navMarker) {
         navMarker = new google.maps.Marker({
@@ -1283,29 +1365,37 @@ function onNavPositionUpdate(pos) {
             map,
             icon: {
                 path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                scale: 6,
+                scale: 7,
                 fillColor: '#4285f4',
                 fillOpacity: 1,
                 strokeColor: '#ffffff',
-                strokeWeight: 2,
-                rotation: pos.coords.heading || 0
+                strokeWeight: 2.5,
+                rotation: navLastHeading
             },
             zIndex: 1000
         });
     } else {
         navMarker.setPosition(userPos);
-        if (pos.coords.heading) {
-            navMarker.setIcon({
-                ...navMarker.getIcon(),
-                rotation: pos.coords.heading
-            });
-        }
+        navMarker.setIcon({
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            scale: 7,
+            fillColor: '#4285f4',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2.5,
+            rotation: navLastHeading
+        });
     }
 
-    map.panTo(userPos);
-    if (map.getZoom() < 15) map.setZoom(16);
+    if (navFollowing) {
+        map.panTo(userPos);
+        if (map.getZoom() < 16) map.setZoom(17);
+        map.setTilt(45);
+        if (navLastHeading) map.setHeading(navLastHeading);
+    }
 
     advanceStep(userPos);
+    checkOffRoute(userPos);
 
     document.getElementById('nav-speed').textContent = speedMph + ' mph';
 
@@ -1315,66 +1405,251 @@ function onNavPositionUpdate(pos) {
         remainTime += navSteps[i].duration ? navSteps[i].duration.value : 0;
     }
 
-    const distToStepStart = google.maps.geometry
-        ? google.maps.geometry.spherical.computeDistanceBetween(userPos, navSteps[navCurrentStep].start_location)
-        : estimateDistance(userLat, userLng, navSteps[navCurrentStep].start_location.lat(), navSteps[navCurrentStep].start_location.lng());
+    const distToNextEnd = estimateDistance(
+        userLat, userLng,
+        navSteps[navCurrentStep].end_location.lat(),
+        navSteps[navCurrentStep].end_location.lng()
+    );
+    const stepDist = navSteps[navCurrentStep].distance ? navSteps[navCurrentStep].distance.value : 0;
+    const adjustedRemain = remainDist - stepDist + distToNextEnd;
 
-    const remainMiles = (remainDist / 1609.34).toFixed(1);
-    document.getElementById('nav-remaining-dist').textContent = remainMiles + ' mi';
+    const progressPct = navTotalDist > 0 ? Math.min(100, ((navTotalDist - adjustedRemain) / navTotalDist) * 100) : 0;
+    document.getElementById('nav-progress-fill').style.width = progressPct + '%';
+
+    const remainMiles = (adjustedRemain / 1609.34);
+    document.getElementById('nav-remaining-dist').textContent = remainMiles >= 10 ? Math.round(remainMiles) + ' mi' : remainMiles.toFixed(1) + ' mi';
     document.getElementById('nav-remaining-time').textContent = formatDuration(remainTime);
 
     const eta = new Date(Date.now() + remainTime * 1000);
     document.getElementById('nav-eta').textContent = eta.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
+    updateNavDistanceToTurn(userLat, userLng);
     updateNavUI();
+    updateNavStepsList();
+}
+
+function updateNavDistanceToTurn(userLat, userLng) {
+    if (navCurrentStep >= navSteps.length) return;
+    const step = navSteps[navCurrentStep];
+    const endLoc = step.end_location;
+    const distM = estimateDistance(userLat, userLng, endLoc.lat(), endLoc.lng());
+    const distEl = document.getElementById('nav-distance-next');
+
+    if (distM < 30) {
+        distEl.textContent = 'Now';
+    } else if (distM < 161) {
+        distEl.textContent = Math.round(distM) + ' m';
+    } else if (distM < 1609) {
+        distEl.textContent = Math.round(distM * 3.281) + ' ft';
+    } else {
+        const mi = distM / 1609.34;
+        distEl.textContent = mi >= 10 ? Math.round(mi) + ' mi' : mi.toFixed(1) + ' mi';
+    }
+
+    if (distM < 200 && navCurrentStep !== navLastAlertStep) {
+        showTurnAlert(step);
+        navLastAlertStep = navCurrentStep;
+    }
+}
+
+function showTurnAlert(step) {
+    const alertEl = document.getElementById('nav-alert');
+    const text = (step.maneuver || '' + ' ' + step.instructions || '').toLowerCase();
+    let icon = '↗️';
+    if (text.includes('left')) icon = '⬅️';
+    else if (text.includes('right')) icon = '➡️';
+    else if (text.includes('uturn') || text.includes('u-turn')) icon = '↩️';
+    else if (text.includes('roundabout')) icon = '🔄';
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = step.instructions;
+    const cleanText = tempDiv.textContent;
+
+    document.getElementById('nav-alert-icon').textContent = icon;
+    document.getElementById('nav-alert-text').textContent = cleanText.length > 40 ? cleanText.substring(0, 40) + '...' : cleanText;
+    alertEl.classList.remove('hidden');
+
+    if (navAlertTimeout) clearTimeout(navAlertTimeout);
+    navAlertTimeout = setTimeout(() => {
+        alertEl.classList.add('hidden');
+    }, 3000);
 }
 
 function advanceStep(userPos) {
     if (navCurrentStep >= navSteps.length - 1) {
-        document.getElementById('nav-instruction').textContent = 'You have arrived!';
-        document.getElementById('nav-distance-next').textContent = '🎉';
+        showArrival();
         return;
     }
 
-    const nextStepStart = navSteps[navCurrentStep + 1].start_location;
-    const dist = estimateDistance(
+    const stepEnd = navSteps[navCurrentStep].end_location;
+    const distToEnd = estimateDistance(
         userPos.lat(), userPos.lng(),
-        nextStepStart.lat(), nextStepStart.lng()
+        stepEnd.lat(), stepEnd.lng()
     );
 
-    if (dist < 30) {
+    if (distToEnd < 25) {
         navCurrentStep++;
         if (navCurrentStep >= navSteps.length - 1) {
-            document.getElementById('nav-instruction').textContent = 'You have arrived!';
-            document.getElementById('nav-distance-next').textContent = '🎉';
+            const finalEnd = navSteps[navSteps.length - 1].end_location;
+            const distToFinal = estimateDistance(userPos.lat(), userPos.lng(), finalEnd.lat(), finalEnd.lng());
+            if (distToFinal < 50) {
+                showArrival();
+            }
         }
     }
+}
+
+function showArrival() {
+    const arrivedEl = document.getElementById('nav-arrived');
+    const lastLeg = navRoute.legs[navRoute.legs.length - 1];
+    const elapsed = Date.now() - navStartTime;
+
+    document.getElementById('nav-arrived-address').textContent = lastLeg.end_address;
+    document.getElementById('nav-arrived-stats').innerHTML = `
+        <span>⏱ ${formatDuration(Math.round(elapsed / 1000))}</span>
+        <span>📏 ${(navTotalDist / 1609.34).toFixed(1)} mi</span>
+    `;
+    arrivedEl.classList.remove('hidden');
+}
+
+function checkOffRoute(userPos) {
+    if (navCurrentStep >= navSteps.length) return;
+    const step = navSteps[navCurrentStep];
+    const distToStart = estimateDistance(
+        userPos.lat(), userPos.lng(),
+        step.start_location.lat(), step.start_location.lng()
+    );
+    const distToEnd = estimateDistance(
+        userPos.lat(), userPos.lng(),
+        step.end_location.lat(), step.end_location.lng()
+    );
+    const stepLen = step.distance ? step.distance.value : 0;
+    const topBar = document.getElementById('nav-top-bar');
+
+    if (distToStart > stepLen + 200 && distToEnd > stepLen + 200 && stepLen > 0) {
+        topBar.classList.add('nav-rerouting');
+        document.getElementById('nav-instruction').textContent = 'Rerouting...';
+        document.getElementById('nav-distance-next').textContent = '📡';
+        reroute(userPos);
+    } else {
+        topBar.classList.remove('nav-rerouting');
+    }
+}
+
+let rerouteDebounce = null;
+function reroute(userPos) {
+    if (rerouteDebounce) return;
+    rerouteDebounce = setTimeout(async () => {
+        rerouteDebounce = null;
+        if (!navActive) return;
+        try {
+            const lastLeg = navRoute.legs[navRoute.legs.length - 1];
+            const dest = lastLeg.end_address;
+            const origin = `${userPos.lat()},${userPos.lng()}`;
+            const result = await getRoute(origin, dest, []);
+            if (!navActive) return;
+
+            navRoute = result.routes[0];
+            const allSteps = [];
+            navTotalDist = 0;
+            for (const leg of navRoute.legs) {
+                for (const step of leg.steps) {
+                    allSteps.push(step);
+                    navTotalDist += step.distance ? step.distance.value : 0;
+                }
+            }
+            navSteps = allSteps;
+            navCurrentStep = 0;
+
+            if (navRenderer) navRenderer.setMap(null);
+            navRenderer = new google.maps.DirectionsRenderer({
+                map,
+                directions: result,
+                routeIndex: 0,
+                suppressMarkers: true,
+                preserveViewport: true,
+                polylineOptions: { strokeColor: '#4285f4', strokeWeight: 7, strokeOpacity: 0.85, zIndex: 10 }
+            });
+
+            document.getElementById('nav-top-bar').classList.remove('nav-rerouting');
+            buildNavStepsList();
+            updateNavUI();
+        } catch {}
+    }, 3000);
 }
 
 function updateNavUI() {
     if (navCurrentStep >= navSteps.length) return;
     const step = navSteps[navCurrentStep];
     const instrEl = document.getElementById('nav-instruction');
-    const distEl = document.getElementById('nav-distance-next');
 
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = step.instructions;
     instrEl.textContent = tempDiv.textContent;
 
-    if (step.distance) {
-        distEl.textContent = step.distance.text;
-    }
-
     const icon = getNavManeuverSVG(step.maneuver || '', step.instructions || '');
     document.getElementById('nav-maneuver-icon').innerHTML = icon;
+
+    const nextStepEl = document.getElementById('nav-next-step');
+    if (navCurrentStep + 1 < navSteps.length) {
+        const next = navSteps[navCurrentStep + 1];
+        const nextIcon = getNavManeuverSVG(next.maneuver || '', next.instructions || '');
+        const nextTemp = document.createElement('div');
+        nextTemp.innerHTML = next.instructions;
+        const dist = next.distance ? next.distance.text : '';
+        document.getElementById('nav-next-icon').innerHTML = nextIcon.replace('width="36" height="36"', 'width="18" height="18"');
+        document.getElementById('nav-next-text').textContent = `Then ${dist ? dist + ' · ' : ''}${nextTemp.textContent}`;
+        nextStepEl.classList.remove('hidden');
+    } else {
+        nextStepEl.classList.add('hidden');
+    }
+}
+
+function buildNavStepsList() {
+    const list = document.getElementById('nav-steps-list');
+    list.innerHTML = '';
+    navSteps.forEach((step, i) => {
+        const item = document.createElement('div');
+        item.className = 'nav-step-item' + (i === navCurrentStep ? ' active' : '') + (i < navCurrentStep ? ' completed' : '');
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = step.instructions;
+        item.innerHTML = `
+            <div class="nav-step-num">${i + 1}</div>
+            <div class="nav-step-text">${tempDiv.textContent}</div>
+            <div class="nav-step-dist">${step.distance ? step.distance.text : ''}</div>
+        `;
+        list.appendChild(item);
+    });
+}
+
+function updateNavStepsList() {
+    const items = document.querySelectorAll('.nav-step-item');
+    items.forEach((item, i) => {
+        item.className = 'nav-step-item' + (i === navCurrentStep ? ' active' : '') + (i < navCurrentStep ? ' completed' : '');
+    });
+    const activeItem = document.querySelector('.nav-step-item.active');
+    if (activeItem) activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function toggleNavStepsDrawer() {
+    const drawer = document.getElementById('nav-steps-drawer');
+    drawer.classList.toggle('hidden');
+    if (!drawer.classList.contains('hidden')) {
+        buildNavStepsList();
+    }
 }
 
 function getNavManeuverSVG(maneuver, instructions) {
     const text = (maneuver + ' ' + instructions).toLowerCase();
-    if (text.includes('left')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M14 7l-5 5 5 5V7z"/></svg>';
-    if (text.includes('right')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M10 17l5-5-5-5v10z"/></svg>';
     if (text.includes('uturn') || text.includes('u-turn')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M18 9v12h-2V9c0-2.21-1.79-4-4-4S8 6.79 8 9v4.17l1.59-1.59L11 13l-4 4-4-4 1.41-1.41L6 13.17V9c0-3.31 2.69-6 6-6s6 2.69 6 6z"/></svg>';
+    if (text.includes('sharp-left') || text.includes('sharp left')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M6 6.83L4.41 8.41 3 7l4-4 4 4-1.41 1.41L8 6.83V13h8c1.1 0 2 .9 2 2v6h-2v-6H8c-1.1 0-2-.9-2-2V6.83z"/></svg>';
+    if (text.includes('sharp-right') || text.includes('sharp right')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M18 6.83l-1.59 1.58L15 7l4-4 4 4-1.41 1.41L20 6.83V13h-8c-1.1 0-2 .9-2 2v6H8v-6c0-1.1-.9-2-2-2h8V6.83z"/></svg>';
+    if (text.includes('turn-left') || text.includes('turn left') || text.includes('left')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M14 7l-5 5 5 5V7z"/></svg>';
+    if (text.includes('turn-right') || text.includes('turn right') || text.includes('right')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M10 17l5-5-5-5v10z"/></svg>';
     if (text.includes('roundabout')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>';
+    if (text.includes('merge')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M17 4l-1.41 1.41L17.17 7H8c-2.76 0-5 2.24-5 5v5h2v-5c0-1.65 1.35-3 3-3h9.17l-1.58 1.59L17 12l4-4-4-4z"/></svg>';
+    if (text.includes('ramp') || text.includes('exit') || text.includes('off-ramp')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M18 6.83l1.59 1.58L21 7l-4-4-4 4 1.41 1.41L16 6.83V10c0 3.07-1.64 5.64-4 7.08V4h-2v13.08C7.64 15.64 6 13.07 6 10V6.83L7.59 8.41 9 7 5 3 1 7l1.41 1.41L4 6.83V10c0 3.72 2.01 6.94 5 8.72V21h6v-2.28c2.99-1.78 5-5 5-8.72V6.83z"/></svg>';
+    if (text.includes('fork')) return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M14 7l5 5-5 5V7zM3 17v2h18v-2H3zM10 7v10l-5-5 5-5z"/></svg>';
     return '<svg viewBox="0 0 24 24" width="36" height="36"><path fill="white" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>';
 }
 
@@ -1389,23 +1664,25 @@ function estimateDistance(lat1, lon1, lat2, lon2) {
 }
 
 async function fetchNavWeather() {
-    if (!navActive || !navRoute) return;
-    const leg = navRoute.legs[0];
-    const startLoc = leg.start_location;
+    if (!navActive) return;
+    const loc = navMarker ? navMarker.getPosition() : (navRoute ? navRoute.legs[0].start_location : null);
+    if (!loc) return;
     try {
         const dateStr = new Date().toISOString().split('T')[0];
         const hour = new Date().getHours();
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${startLoc.lat()}&longitude=${startLoc.lng()}&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`);
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat()}&longitude=${loc.lng()}&hourly=temperature_2m,weathercode,windspeed_10m&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`);
         const data = await res.json();
         if (data.hourly && data.hourly.temperature_2m) {
             const h = Math.min(hour, data.hourly.time.length - 1);
             const temp = Math.round(data.hourly.temperature_2m[h]);
             const code = data.hourly.weathercode[h];
+            const wind = data.hourly.windspeed_10m ? Math.round(data.hourly.windspeed_10m[h]) : null;
             const info = weatherCodeToInfo(code);
             const strip = document.getElementById('nav-weather-strip');
             document.getElementById('nav-weather-icon').textContent = info.icon;
             document.getElementById('nav-weather-temp').textContent = temp + '°F';
             document.getElementById('nav-weather-desc').textContent = info.desc;
+            document.getElementById('nav-weather-wind').textContent = wind ? `💨 ${wind} mph` : '';
             strip.classList.remove('hidden');
         }
     } catch {}
