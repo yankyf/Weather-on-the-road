@@ -412,12 +412,20 @@ function enableRadar() {
     let cacheBuster = Math.floor(Date.now() / 1000);
     radarLayer = new google.maps.ImageMapType({
         getTileUrl: (coord, zoom) => {
-            if (zoom > 12 || zoom < 1) return null;
-            return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/${zoom}/${coord.x}/${coord.y}.png?_t=${cacheBuster}`;
+            if (zoom < 1) return null;
+            const maxZoom = 12;
+            if (zoom <= maxZoom) {
+                return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/${zoom}/${coord.x}/${coord.y}.png?_t=${cacheBuster}`;
+            }
+            const scale = 1 << (zoom - maxZoom);
+            const tileX = Math.floor(coord.x / scale);
+            const tileY = Math.floor(coord.y / scale);
+            return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/${maxZoom}/${tileX}/${tileY}.png?_t=${cacheBuster}`;
         },
         tileSize: new google.maps.Size(256, 256),
         opacity: 0.6,
-        name: 'Radar'
+        name: 'Radar',
+        maxZoom: 20
     });
     map.overlayMapTypes.insertAt(0, radarLayer);
 
@@ -427,20 +435,26 @@ function enableRadar() {
 
 function refreshRadar() {
     if (!radarLayer) return;
-    const wasEnabled = !!radarLayer;
-    if (!wasEnabled) return;
     for (let i = map.overlayMapTypes.getLength() - 1; i >= 0; i--) {
         if (map.overlayMapTypes.getAt(i) === radarLayer) map.overlayMapTypes.removeAt(i);
     }
     let cacheBuster = Math.floor(Date.now() / 1000);
     radarLayer = new google.maps.ImageMapType({
         getTileUrl: (coord, zoom) => {
-            if (zoom > 12 || zoom < 1) return null;
-            return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/${zoom}/${coord.x}/${coord.y}.png?_t=${cacheBuster}`;
+            if (zoom < 1) return null;
+            const maxZoom = 12;
+            if (zoom <= maxZoom) {
+                return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/${zoom}/${coord.x}/${coord.y}.png?_t=${cacheBuster}`;
+            }
+            const scale = 1 << (zoom - maxZoom);
+            const tileX = Math.floor(coord.x / scale);
+            const tileY = Math.floor(coord.y / scale);
+            return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/${maxZoom}/${tileX}/${tileY}.png?_t=${cacheBuster}`;
         },
         tileSize: new google.maps.Size(256, 256),
         opacity: 0.6,
-        name: 'Radar'
+        name: 'Radar',
+        maxZoom: 20
     });
     map.overlayMapTypes.insertAt(0, radarLayer);
 }
