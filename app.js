@@ -401,6 +401,7 @@ function initApp() {
 
         updateStopIndicators();
         initTimelineDrag();
+        initSavedPlaces();
     } catch (err) {
         showError('Google Maps failed to initialize: ' + err.message);
     }
@@ -845,7 +846,7 @@ function showWeatherChart(weatherData) {
     let iconLabels = '';
     valid.forEach((wp, i) => {
         const x = i * 60 + 30;
-        const info = weatherCodeToInfo(wp.weatherCode);
+        const info = weatherCodeToInfo(wp.weatherCode, wp.arrivalTime.getHours());
         iconLabels += `<text x="${x}" y="${chartH + 40}" text-anchor="middle" font-size="14">${info.icon}</text>`;
     });
 
@@ -865,7 +866,7 @@ function showWeatherChart(weatherData) {
 function getWeatherAlerts(weatherData) {
     const alerts = [];
     for (const wp of weatherData.filter(w => !w.noForecast)) {
-        const info = weatherCodeToInfo(wp.weatherCode);
+        const info = weatherCodeToInfo(wp.weatherCode, wp.arrivalTime ? wp.arrivalTime.getHours() : undefined);
         const cat = getWeatherCategory(wp.weatherCode);
         if (cat === 'storm') alerts.push({ type: 'danger', icon: '⚡', text: `${info.desc} near ${wp.locationName}` });
         else if (cat === 'snow') alerts.push({ type: 'warning', icon: '🌨️', text: `${info.desc} near ${wp.locationName}` });
@@ -1063,8 +1064,9 @@ function getWeatherCategory(code) {
     return 'clear';
 }
 
-function weatherCodeToInfo(code) {
-    const m = { 0:{icon:'☀️',desc:'Clear sky'},1:{icon:'🌤️',desc:'Mainly clear'},2:{icon:'⛅',desc:'Partly cloudy'},3:{icon:'☁️',desc:'Overcast'},45:{icon:'🌫️',desc:'Foggy'},48:{icon:'🌫️',desc:'Freezing fog'},51:{icon:'🌦️',desc:'Light drizzle'},53:{icon:'🌦️',desc:'Moderate drizzle'},55:{icon:'🌧️',desc:'Heavy drizzle'},61:{icon:'🌧️',desc:'Light rain'},63:{icon:'🌧️',desc:'Moderate rain'},65:{icon:'🌧️',desc:'Heavy rain'},66:{icon:'❄️',desc:'Freezing rain'},67:{icon:'❄️',desc:'Heavy freezing rain'},71:{icon:'🌨️',desc:'Light snow'},73:{icon:'🌨️',desc:'Moderate snow'},75:{icon:'🌨️',desc:'Heavy snow'},77:{icon:'❄️',desc:'Snow grains'},80:{icon:'🌦️',desc:'Light showers'},81:{icon:'🌧️',desc:'Moderate showers'},82:{icon:'⛈️',desc:'Violent showers'},85:{icon:'🌨️',desc:'Light snow showers'},86:{icon:'🌨️',desc:'Heavy snow showers'},95:{icon:'⚡',desc:'Thunderstorm'},96:{icon:'⚡',desc:'Thunderstorm + hail'},99:{icon:'⚡',desc:'Thunderstorm + heavy hail'} };
+function weatherCodeToInfo(code, hour) {
+    const isNight = hour !== undefined && (hour >= 20 || hour < 6);
+    const m = { 0:{icon: isNight ? '🌙' : '☀️',desc: isNight ? 'Clear night' : 'Clear sky'},1:{icon: isNight ? '🌙' : '🌤️',desc: isNight ? 'Mostly clear night' : 'Mainly clear'},2:{icon: isNight ? '☁️' : '⛅',desc:'Partly cloudy'},3:{icon:'☁️',desc:'Overcast'},45:{icon:'🌫️',desc:'Foggy'},48:{icon:'🌫️',desc:'Freezing fog'},51:{icon:'🌦️',desc:'Light drizzle'},53:{icon:'🌦️',desc:'Moderate drizzle'},55:{icon:'🌧️',desc:'Heavy drizzle'},61:{icon:'🌧️',desc:'Light rain'},63:{icon:'🌧️',desc:'Moderate rain'},65:{icon:'🌧️',desc:'Heavy rain'},66:{icon:'❄️',desc:'Freezing rain'},67:{icon:'❄️',desc:'Heavy freezing rain'},71:{icon:'🌨️',desc:'Light snow'},73:{icon:'🌨️',desc:'Moderate snow'},75:{icon:'🌨️',desc:'Heavy snow'},77:{icon:'❄️',desc:'Snow grains'},80:{icon:'🌦️',desc:'Light showers'},81:{icon:'🌧️',desc:'Moderate showers'},82:{icon:'⛈️',desc:'Violent showers'},85:{icon:'🌨️',desc:'Light snow showers'},86:{icon:'🌨️',desc:'Heavy snow showers'},95:{icon:'⚡',desc:'Thunderstorm'},96:{icon:'⚡',desc:'Thunderstorm + hail'},99:{icon:'⚡',desc:'Thunderstorm + heavy hail'} };
     return m[code] || { icon: '❓', desc: 'Unknown' };
 }
 
@@ -1074,7 +1076,7 @@ function buildWeatherBar(weatherData) {
         const wp = weatherData[i];
         const cat = getWeatherCategory(wp.weatherCode);
         const catInfo = cat === 'unknown' ? { color: '#e8eaed', icon: '❓' } : weatherCategories[cat];
-        const info = wp.noForecast ? { icon: '—' } : weatherCodeToInfo(wp.weatherCode);
+        const info = wp.noForecast ? { icon: '—' } : weatherCodeToInfo(wp.weatherCode, wp.arrivalTime ? wp.arrivalTime.getHours() : undefined);
         icons.push({ icon: info.icon, fraction: wp.fraction });
         if (i < weatherData.length - 1) segments.push({ width: (weatherData[i + 1].fraction - wp.fraction) * 100, color: catInfo.color });
     }
@@ -1103,7 +1105,7 @@ function getStepTrafficSegments(route) {
 function showOverlaysOnMap(weatherData) {
     weatherOverlays.forEach(o => o.setMap(null)); weatherOverlays = [];
     weatherData.forEach(wp => {
-        const info = wp.noForecast ? { icon: '—', desc: 'No forecast' } : weatherCodeToInfo(wp.weatherCode);
+        const info = wp.noForecast ? { icon: '—', desc: 'No forecast' } : weatherCodeToInfo(wp.weatherCode, wp.arrivalTime.getHours());
         const timeStr = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const dateStr = wp.arrivalTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const temp = wp.noForecast ? '?' : `${Math.round(wp.temperature)}°`;
@@ -1122,7 +1124,7 @@ function showWeatherCards(weatherData) {
     weatherTimeline.classList.remove('hidden');
     timelineCards.innerHTML = '';
     weatherData.forEach(wp => {
-        const info = wp.noForecast ? { icon: '—', desc: 'No forecast' } : weatherCodeToInfo(wp.weatherCode);
+        const info = wp.noForecast ? { icon: '—', desc: 'No forecast' } : weatherCodeToInfo(wp.weatherCode, wp.arrivalTime.getHours());
         const cat = getWeatherCategory(wp.weatherCode);
         const catInfo = (cat !== 'unknown' && weatherCategories[cat]) ? weatherCategories[cat] : { color: '#9aa0a6' };
         const borderColor = wp.noForecast ? '#e8eaed' : catInfo.color;
@@ -1148,7 +1150,7 @@ function shareTrip() {
     const leg = route.legs[0];
     const text = `🚗 Trip: ${leg.start_address.split(',')[0]} → ${leg.end_address.split(',')[0]}\n⏱ ${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} miles\n\n🌤 Weather along the route:\n` +
         currentWeatherData.filter(w => !w.noForecast).map(w => {
-            const info = weatherCodeToInfo(w.weatherCode);
+            const info = weatherCodeToInfo(w.weatherCode, w.arrivalTime.getHours());
             const time = w.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             return `${time} - ${w.locationName}: ${info.icon} ${Math.round(w.temperature)}°F ${info.desc}`;
         }).join('\n');
@@ -1176,7 +1178,7 @@ function printTrip() {
     if (rd) w.document.write(`<p class="safety" style="background:#e6f4ea;color:#137333">${rd.safetyLabel.icon} ${rd.safetyLabel.text}</p>`);
     w.document.write(`<h2>Weather Forecast</h2><table><tr><th>Time</th><th>Location</th><th>Weather</th><th>Temp</th><th>Wind</th><th>Precip</th></tr>`);
     currentWeatherData.filter(wp => !wp.noForecast).forEach(wp => {
-        const info = weatherCodeToInfo(wp.weatherCode);
+        const info = weatherCodeToInfo(wp.weatherCode, wp.arrivalTime.getHours());
         const time = wp.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const precip = wp.precipitationAmount > 0 ? `${wp.precipitationAmount.toFixed(2)}"` : `${wp.precipitationProb}%`;
         w.document.write(`<tr><td>${time}</td><td>${wp.locationName}</td><td>${info.icon} ${info.desc}</td><td>${Math.round(wp.temperature)}°F</td><td>${Math.round(wp.windSpeed)} mph</td><td>${precip}</td></tr>`);
@@ -1218,6 +1220,140 @@ function loadRecentSearches() {
             destinationInput.value = r.destination;
         });
         recentList.appendChild(item);
+    });
+}
+
+const defaultSavedIcons = { home: '🏠', work: '💼', school: '🎓', gym: '🏋️', airport: '✈️', hospital: '🏥', church: '⛪', store: '🛒' };
+
+function getSavedPlaceIcon(name) {
+    const lower = name.toLowerCase();
+    for (const [key, icon] of Object.entries(defaultSavedIcons)) {
+        if (lower.includes(key)) return icon;
+    }
+    return '📍';
+}
+
+function getSavedPlaces() {
+    return JSON.parse(localStorage.getItem('weatherroad_saved_places') || '[]');
+}
+
+function savePlaces(places) {
+    localStorage.setItem('weatherroad_saved_places', JSON.stringify(places));
+}
+
+function renderSavedPlaces() {
+    const grid = document.getElementById('saved-places-grid');
+    if (!grid) return;
+    const places = getSavedPlaces();
+    grid.innerHTML = '';
+
+    if (places.length === 0) {
+        const defaults = [
+            { name: 'Home', address: '', icon: '🏠' },
+            { name: 'Work', address: '', icon: '💼' }
+        ];
+        defaults.forEach(d => {
+            const chip = document.createElement('button');
+            chip.className = 'saved-place-chip';
+            chip.innerHTML = `<span class="saved-place-icon">${d.icon}</span><span class="saved-place-label">Set ${d.name}</span>`;
+            chip.addEventListener('click', () => {
+                const addr = prompt(`Enter your ${d.name} address:`);
+                if (addr && addr.trim()) {
+                    const newPlaces = getSavedPlaces();
+                    newPlaces.push({ name: d.name, address: addr.trim() });
+                    savePlaces(newPlaces);
+                    renderSavedPlaces();
+                }
+            });
+            grid.appendChild(chip);
+        });
+        return;
+    }
+
+    places.forEach((place, idx) => {
+        const icon = getSavedPlaceIcon(place.name);
+        const chip = document.createElement('button');
+        chip.className = 'saved-place-chip';
+        chip.innerHTML = `
+            <span class="saved-place-icon">${icon}</span>
+            <span class="saved-place-label">${place.name}</span>
+            <span class="saved-place-delete" title="Remove">&times;</span>
+            <div class="saved-place-actions">
+                <button class="saved-action-btn" data-action="origin">Set as start</button>
+                <button class="saved-action-btn" data-action="dest">Set as destination</button>
+            </div>
+        `;
+
+        chip.querySelector('.saved-place-delete').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const p = getSavedPlaces();
+            p.splice(idx, 1);
+            savePlaces(p);
+            renderSavedPlaces();
+        });
+
+        chip.addEventListener('click', (e) => {
+            if (e.target.closest('.saved-place-delete')) return;
+            if (e.target.closest('.saved-action-btn')) return;
+            document.querySelectorAll('.saved-place-chip.show-actions').forEach(c => {
+                if (c !== chip) c.classList.remove('show-actions');
+            });
+            chip.classList.toggle('show-actions');
+        });
+
+        chip.querySelectorAll('.saved-action-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                if (action === 'origin') originInput.value = place.address;
+                else if (action === 'dest') destinationInput.value = place.address;
+                chip.classList.remove('show-actions');
+            });
+        });
+
+        grid.appendChild(chip);
+    });
+}
+
+function initSavedPlaces() {
+    const toggle = document.getElementById('saved-toggle');
+    if (toggle) {
+        toggle.addEventListener('click', () => {
+            const list = document.getElementById('saved-list');
+            const arrow = document.querySelector('.saved-arrow');
+            list.classList.toggle('recent-collapsed');
+            if (arrow) arrow.textContent = list.classList.contains('recent-collapsed') ? '▸' : '▾';
+        });
+    }
+
+    const addBtn = document.getElementById('saved-add-btn');
+    const nameInput = document.getElementById('saved-name-input');
+    const addrInput = document.getElementById('saved-addr-input');
+    if (addBtn) {
+        addBtn.addEventListener('click', () => {
+            const name = nameInput.value.trim();
+            const addr = addrInput.value.trim();
+            if (!name || !addr) return;
+            const places = getSavedPlaces();
+            places.push({ name, address: addr });
+            savePlaces(places);
+            nameInput.value = '';
+            addrInput.value = '';
+            renderSavedPlaces();
+        });
+    }
+
+    if (addrInput && google.maps && google.maps.places) {
+        const sb = new google.maps.places.SearchBox(addrInput);
+        if (map) map.addListener('bounds_changed', () => sb.setBounds(map.getBounds()));
+    }
+
+    renderSavedPlaces();
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.saved-place-chip')) {
+            document.querySelectorAll('.saved-place-chip.show-actions').forEach(c => c.classList.remove('show-actions'));
+        }
     });
 }
 
@@ -1781,7 +1917,7 @@ async function fetchNavWeather() {
             const temp = Math.round(data.hourly.temperature_2m[h]);
             const code = data.hourly.weathercode[h];
             const wind = data.hourly.windspeed_10m ? Math.round(data.hourly.windspeed_10m[h]) : null;
-            const info = weatherCodeToInfo(code);
+            const info = weatherCodeToInfo(code, hour);
             const strip = document.getElementById('nav-weather-strip');
             document.getElementById('nav-weather-icon').textContent = info.icon;
             document.getElementById('nav-weather-temp').textContent = temp + '°F';
