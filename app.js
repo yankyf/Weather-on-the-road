@@ -1,3 +1,56 @@
+function svgIcon(name, size = 20, color = 'currentColor') {
+    const s = size, c = color;
+    const icons = {
+        sun: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
+        moon: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
+        cloud: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>`,
+        'cloud-sun': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 .9-9.92 8.08 8.08 0 0 1 13.1 3.3"/><path d="M18 18a3 3 0 1 0 0-6h-.5"/></svg>`,
+        'cloud-rain': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/></svg>`,
+        'cloud-drizzle': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><line x1="8" y1="19" x2="8" y2="20"/><line x1="12" y1="19" x2="12" y2="20"/><line x1="16" y1="19" x2="16" y2="20"/></svg>`,
+        'cloud-snow': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/><line x1="8" y1="20" x2="8.01" y2="20"/><line x1="12" y1="20" x2="12.01" y2="20"/><line x1="16" y1="20" x2="16.01" y2="20"/><line x1="10" y1="22" x2="10.01" y2="22"/><line x1="14" y1="22" x2="14.01" y2="22"/></svg>`,
+        snowflake: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/><line x1="19.07" y1="4.93" x2="4.93" y2="19.07"/></svg>`,
+        'cloud-lightning': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/></svg>`,
+        fog: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"><line x1="3" y1="8" x2="21" y2="8"/><line x1="5" y1="12" x2="19" y2="12"/><line x1="3" y1="16" x2="21" y2="16"/><line x1="7" y1="20" x2="17" y2="20"/></svg>`,
+        'cloud-sun-rain': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M3 20a5 5 0 1 1 8.9-4H18a3 3 0 0 1 2 5.24"/><path d="M11 20v2"/><path d="M7 19v2"/></svg>`,
+        'violent-storm': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/><line x1="7" y1="19" x2="7" y2="21"/><line x1="17" y1="19" x2="17" y2="21"/></svg>`,
+        wind: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>`,
+        droplet: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`,
+        ice: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/><path d="m6 6 2 2m8 8 2 2M6 18l2-2m8-8 2-2"/><circle cx="12" cy="12" r="3"/></svg>`,
+        thermometer: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>`,
+        flame: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
+        'dot-green': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#34a853"/></svg>`,
+        'dot-yellow': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#fbbc04"/></svg>`,
+        'dot-orange': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#fa7b17"/></svg>`,
+        'dot-red': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#ea4335"/></svg>`,
+        car: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9L18 10l-2.7-3.4A2 2 0 0 0 13.7 6H10a2 2 0 0 0-1.5.7L5.8 10l-2.3 1.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>`,
+        motorcycle: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="17" r="3"/><circle cx="19" cy="17" r="3"/><path d="M11 6h3l4 5h-7l-2-3"/><path d="M8 17h8"/></svg>`,
+        bike: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`,
+        walk: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="1.5"/><path d="M10 21l1-5-2-1v-4l3-3 2 4h3"/><path d="M7 21l3-7"/></svg>`,
+        home: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+        briefcase: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
+        school: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5"/></svg>`,
+        dumbbell: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5h11M6.5 17.5h11"/><rect x="2" y="6.5" width="4.5" height="11" rx="1"/><rect x="17.5" y="6.5" width="4.5" height="11" rx="1"/><line x1="12" y1="6.5" x2="12" y2="17.5"/></svg>`,
+        plane: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`,
+        hospital: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>`,
+        church: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M10 4h4"/><path d="M8 9l4-3 4 3"/><path d="M6 22V12l6-3 6 3v10"/><path d="M10 22v-4a2 2 0 0 1 4 0v4"/></svg>`,
+        store: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-4h16l1 4"/><path d="M3 9v12h18V9"/><path d="M3 9c0 1.7 1.3 3 3 3s3-1.3 3-3"/><path d="M9 9c0 1.7 1.3 3 3 3s3-1.3 3-3"/><path d="M15 9c0 1.7 1.3 3 3 3s3-1.3 3-3"/></svg>`,
+        'map-pin': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+        satellite: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7 9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4"/><path d="m4.93 19.07 2.83-2.83"/><circle cx="12" cy="12" r="1"/></svg>`,
+        'arrow-up-right': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>`,
+        'arrow-left': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>`,
+        'arrow-right': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`,
+        'u-turn': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`,
+        'rotate-cw': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`,
+        timer: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M9 2h6"/></svg>`,
+        ruler: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>`,
+        party: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12v0c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11v0c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98v0C9.52 4.9 9 5.52 9 6.23V7"/></svg>`,
+        check: `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+        'question-mark': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+        'weather-bar': `<svg class="wi" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M22 10a3 3 0 0 0-3-3h-2.207a5.502 5.502 0 0 0-10.702.5"/></svg>`,
+    };
+    return icons[name] || `<span class="wi" style="width:${s}px;height:${s}px;display:inline-block">?</span>`;
+}
+
 const allStopsContainer = document.getElementById('all-stops');
 let originInput = allStopsContainer.querySelector('.stop-row:first-child input');
 let destinationInput = allStopsContainer.querySelector('.stop-row:last-child input');
@@ -590,10 +643,10 @@ function calcRouteScore(weatherData) {
 }
 
 function getSafetyLabel(score) {
-    if (score >= 9) return { text: 'Very safe drive', cls: 'safety-great', icon: '🟢' };
-    if (score >= 7) return { text: 'Safe drive', cls: 'safety-good', icon: '🟡' };
-    if (score >= 5) return { text: 'Use caution', cls: 'safety-caution', icon: '🟠' };
-    return { text: 'Unsafe conditions', cls: 'safety-danger', icon: '🔴' };
+    if (score >= 9) return { text: 'Very safe drive', cls: 'safety-great', icon: svgIcon('dot-green', 14) };
+    if (score >= 7) return { text: 'Safe drive', cls: 'safety-good', icon: svgIcon('dot-yellow', 14) };
+    if (score >= 5) return { text: 'Use caution', cls: 'safety-caution', icon: svgIcon('dot-orange', 14) };
+    return { text: 'Unsafe conditions', cls: 'safety-danger', icon: svgIcon('dot-red', 14) };
 }
 
 function getDaylightInfo(weatherData) {
@@ -614,24 +667,24 @@ function getDaylightInfo(weatherData) {
     }
     const dayPct = Math.round(((totalMin - darkMin) / totalMin) * 100);
     const darkPct = 100 - dayPct;
-    if (darkPct === 0) return '☀️ 100% daylight';
-    if (dayPct === 0) return '🌙 100% dark';
-    return `☀️ ${dayPct}% day · 🌙 ${darkPct}% dark`;
+    if (darkPct === 0) return `${svgIcon('sun', 14)} 100% daylight`;
+    if (dayPct === 0) return `${svgIcon('moon', 14)} 100% dark`;
+    return `${svgIcon('sun', 14)} ${dayPct}% day · ${svgIcon('moon', 14)} ${darkPct}% dark`;
 }
 
 function getRoadConditions(weatherData) {
     const conditions = [];
     for (const wp of weatherData.filter(w => !w.noForecast)) {
         if (wp.temperature <= 32 && [61,63,65,66,67,80,81,82,51,53,55].includes(wp.weatherCode))
-            conditions.push({ type: 'danger', icon: '🧊', text: `Icy roads near ${wp.locationName}` });
+            conditions.push({ type: 'danger', icon: svgIcon('ice', 16), text: `Icy roads near ${wp.locationName}` });
         else if (wp.temperature <= 32 && [71,73,75,77,85,86].includes(wp.weatherCode))
-            conditions.push({ type: 'danger', icon: '🧊', text: `Snow-covered roads near ${wp.locationName}` });
+            conditions.push({ type: 'danger', icon: svgIcon('ice', 16), text: `Snow-covered roads near ${wp.locationName}` });
         else if ([61,63,65,80,81,82].includes(wp.weatherCode))
-            conditions.push({ type: 'warning', icon: '💧', text: `Wet roads near ${wp.locationName}` });
+            conditions.push({ type: 'warning', icon: svgIcon('droplet', 16), text: `Wet roads near ${wp.locationName}` });
         if (wp.weatherCode === 45 || wp.weatherCode === 48)
-            conditions.push({ type: 'warning', icon: '🌫️', text: `Low visibility near ${wp.locationName}` });
+            conditions.push({ type: 'warning', icon: svgIcon('fog', 16), text: `Low visibility near ${wp.locationName}` });
         if (wp.windSpeed >= 40)
-            conditions.push({ type: 'warning', icon: '💨', text: `Crosswinds near ${wp.locationName}` });
+            conditions.push({ type: 'warning', icon: svgIcon('wind', 16), text: `Crosswinds near ${wp.locationName}` });
     }
     return conditions;
 }
@@ -731,14 +784,14 @@ function displayRoutes(directionsResult, routeData, departureTime) {
             <div class="route-badges">${badgesHtml}</div>
             <div class="route-bars-compact">
                 <div class="bar-row-compact weather-bar-row">
-                    <span class="bar-icon" title="Weather">🌤</span>
+                    <span class="bar-icon" title="Weather">${svgIcon('weather-bar', 16, '#5f6368')}</span>
                     <div class="bar-track-wrap">
                         <div class="weather-icons-row">${weatherIconsHtml}</div>
                         <div class="bar-track"><div class="bar-fill">${weatherBarHtml}</div></div>
                     </div>
                 </div>
                 <div class="bar-row-compact">
-                    <span class="bar-icon" title="Traffic">🚗</span>
+                    <span class="bar-icon" title="Traffic">${svgIcon('car', 16, '#5f6368')}</span>
                     <div class="bar-track"><div class="bar-fill">${trafficBarHtml}</div></div>
                     <span class="bar-info" style="color:${traffic.labelColor}">${traffic.label}</span>
                 </div>
@@ -760,8 +813,8 @@ function displayRoutes(directionsResult, routeData, departureTime) {
 function getModeLabel() {
     const activeBtn = document.querySelector('.travel-mode-btn.active');
     const mode = activeBtn ? activeBtn.dataset.mode : 'DRIVING';
-    const labels = { DRIVING: '🚗 Driving', MOTORCYCLE: '🏍️ Motorcycle', BICYCLING: '🚴 Cycling', WALKING: '🚶 Walking' };
-    return labels[mode] || '🚗 Driving';
+    const labels = { DRIVING: `${svgIcon('car', 14)} Driving`, MOTORCYCLE: `${svgIcon('motorcycle', 14)} Motorcycle`, BICYCLING: `${svgIcon('bike', 14)} Cycling`, WALKING: `${svgIcon('walk', 14)} Walking` };
+    return labels[mode] || `${svgIcon('car', 14)} Driving`;
 }
 
 function showDirections(directionsResult, routeIndex, rd) {
@@ -805,7 +858,7 @@ function showDirections(directionsResult, routeIndex, rd) {
 
     const arrive = document.createElement('div');
     arrive.className = 'direction-step arrive';
-    arrive.innerHTML = `<div class="step-number">✓</div><div class="step-icon">📍</div><div class="step-content"><div class="step-instruction"><strong>Arrive at ${leg.end_address.split(',')[0]}</strong></div></div>`;
+    arrive.innerHTML = `<div class="step-number">${svgIcon('check', 14, '#34a853')}</div><div class="step-icon">${svgIcon('map-pin', 18, '#ea4335')}</div><div class="step-content"><div class="step-instruction"><strong>Arrive at ${leg.end_address.split(',')[0]}</strong></div></div>`;
     stepsContainer.appendChild(arrive);
 
     directionsPanel.appendChild(stepsContainer);
@@ -847,7 +900,7 @@ function showWeatherChart(weatherData) {
     valid.forEach((wp, i) => {
         const x = i * 60 + 30;
         const info = weatherCodeToInfo(wp.weatherCode, wp.arrivalTime.getHours());
-        iconLabels += `<text x="${x}" y="${chartH + 40}" text-anchor="middle" font-size="14">${info.icon}</text>`;
+        iconLabels += `<foreignObject x="${x - 10}" y="${chartH + 28}" width="20" height="20">${info.icon}</foreignObject>`;
     });
 
     weatherChart.innerHTML = `<svg width="${w}" height="${chartH + 48}" viewBox="0 0 ${w} ${chartH + 48}">
@@ -868,13 +921,13 @@ function getWeatherAlerts(weatherData) {
     for (const wp of weatherData.filter(w => !w.noForecast)) {
         const info = weatherCodeToInfo(wp.weatherCode, wp.arrivalTime ? wp.arrivalTime.getHours() : undefined);
         const cat = getWeatherCategory(wp.weatherCode);
-        if (cat === 'storm') alerts.push({ type: 'danger', icon: '⚡', text: `${info.desc} near ${wp.locationName}` });
-        else if (cat === 'snow') alerts.push({ type: 'warning', icon: '🌨️', text: `${info.desc} near ${wp.locationName}` });
-        else if (wp.weatherCode === 65 || wp.weatherCode === 82) alerts.push({ type: 'warning', icon: '🌧️', text: `${info.desc} near ${wp.locationName}` });
-        else if (wp.weatherCode === 45 || wp.weatherCode === 48) alerts.push({ type: 'caution', icon: '🌫️', text: `${info.desc} near ${wp.locationName}` });
-        if (wp.windSpeed >= 30) alerts.push({ type: 'warning', icon: '💨', text: `High winds (${Math.round(wp.windSpeed)} mph) near ${wp.locationName}` });
-        if (wp.temperature <= 32) alerts.push({ type: 'caution', icon: '🥶', text: `Freezing (${Math.round(wp.temperature)}°F) near ${wp.locationName}` });
-        else if (wp.temperature >= 100) alerts.push({ type: 'caution', icon: '🔥', text: `Extreme heat (${Math.round(wp.temperature)}°F) near ${wp.locationName}` });
+        if (cat === 'storm') alerts.push({ type: 'danger', icon: svgIcon('cloud-lightning', 16), text: `${info.desc} near ${wp.locationName}` });
+        else if (cat === 'snow') alerts.push({ type: 'warning', icon: svgIcon('cloud-snow', 16), text: `${info.desc} near ${wp.locationName}` });
+        else if (wp.weatherCode === 65 || wp.weatherCode === 82) alerts.push({ type: 'warning', icon: svgIcon('cloud-rain', 16), text: `${info.desc} near ${wp.locationName}` });
+        else if (wp.weatherCode === 45 || wp.weatherCode === 48) alerts.push({ type: 'caution', icon: svgIcon('fog', 16), text: `${info.desc} near ${wp.locationName}` });
+        if (wp.windSpeed >= 30) alerts.push({ type: 'warning', icon: svgIcon('wind', 16), text: `High winds (${Math.round(wp.windSpeed)} mph) near ${wp.locationName}` });
+        if (wp.temperature <= 32) alerts.push({ type: 'caution', icon: svgIcon('thermometer', 16), text: `Freezing (${Math.round(wp.temperature)}°F) near ${wp.locationName}` });
+        else if (wp.temperature >= 100) alerts.push({ type: 'caution', icon: svgIcon('flame', 16), text: `Extreme heat (${Math.round(wp.temperature)}°F) near ${wp.locationName}` });
     }
     return alerts;
 }
@@ -1051,11 +1104,11 @@ async function getWeatherForWaypoints(waypoints) {
 }
 
 const weatherCategories = {
-    clear: { label: 'Clear', color: '#34a853', icon: '☀️', codes: [0, 1] },
-    cloudy: { label: 'Cloudy', color: '#9aa0a6', icon: '☁️', codes: [2, 3, 45, 48] },
-    rain: { label: 'Rain', color: '#4285f4', icon: '🌧️', codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
-    snow: { label: 'Snow', color: '#a855f7', icon: '🌨️', codes: [66, 67, 71, 73, 75, 77, 85, 86] },
-    storm: { label: 'Storm', color: '#ea4335', icon: '⚡', codes: [95, 96, 99] },
+    clear: { label: 'Clear', color: '#34a853', get icon() { return svgIcon('sun', 16, '#34a853'); }, codes: [0, 1] },
+    cloudy: { label: 'Cloudy', color: '#9aa0a6', get icon() { return svgIcon('cloud', 16, '#9aa0a6'); }, codes: [2, 3, 45, 48] },
+    rain: { label: 'Rain', color: '#4285f4', get icon() { return svgIcon('cloud-rain', 16, '#4285f4'); }, codes: [51, 53, 55, 61, 63, 65, 80, 81, 82] },
+    snow: { label: 'Snow', color: '#a855f7', get icon() { return svgIcon('cloud-snow', 16, '#a855f7'); }, codes: [66, 67, 71, 73, 75, 77, 85, 86] },
+    storm: { label: 'Storm', color: '#ea4335', get icon() { return svgIcon('cloud-lightning', 16, '#ea4335'); }, codes: [95, 96, 99] },
 };
 
 function getWeatherCategory(code) {
@@ -1066,8 +1119,8 @@ function getWeatherCategory(code) {
 
 function weatherCodeToInfo(code, hour) {
     const isNight = hour !== undefined && (hour >= 20 || hour < 6);
-    const m = { 0:{icon: isNight ? '🌙' : '☀️',desc: isNight ? 'Clear night' : 'Clear sky'},1:{icon: isNight ? '🌙' : '🌤️',desc: isNight ? 'Mostly clear night' : 'Mainly clear'},2:{icon: isNight ? '☁️' : '⛅',desc:'Partly cloudy'},3:{icon:'☁️',desc:'Overcast'},45:{icon:'🌫️',desc:'Foggy'},48:{icon:'🌫️',desc:'Freezing fog'},51:{icon:'🌦️',desc:'Light drizzle'},53:{icon:'🌦️',desc:'Moderate drizzle'},55:{icon:'🌧️',desc:'Heavy drizzle'},61:{icon:'🌧️',desc:'Light rain'},63:{icon:'🌧️',desc:'Moderate rain'},65:{icon:'🌧️',desc:'Heavy rain'},66:{icon:'❄️',desc:'Freezing rain'},67:{icon:'❄️',desc:'Heavy freezing rain'},71:{icon:'🌨️',desc:'Light snow'},73:{icon:'🌨️',desc:'Moderate snow'},75:{icon:'🌨️',desc:'Heavy snow'},77:{icon:'❄️',desc:'Snow grains'},80:{icon:'🌦️',desc:'Light showers'},81:{icon:'🌧️',desc:'Moderate showers'},82:{icon:'⛈️',desc:'Violent showers'},85:{icon:'🌨️',desc:'Light snow showers'},86:{icon:'🌨️',desc:'Heavy snow showers'},95:{icon:'⚡',desc:'Thunderstorm'},96:{icon:'⚡',desc:'Thunderstorm + hail'},99:{icon:'⚡',desc:'Thunderstorm + heavy hail'} };
-    return m[code] || { icon: '❓', desc: 'Unknown' };
+    const m = { 0:{icon: isNight ? svgIcon('moon',18) : svgIcon('sun',18),desc: isNight ? 'Clear night' : 'Clear sky'},1:{icon: isNight ? svgIcon('moon',18) : svgIcon('cloud-sun',18),desc: isNight ? 'Mostly clear night' : 'Mainly clear'},2:{icon: isNight ? svgIcon('cloud',18) : svgIcon('cloud-sun',18),desc:'Partly cloudy'},3:{icon:svgIcon('cloud',18),desc:'Overcast'},45:{icon:svgIcon('fog',18),desc:'Foggy'},48:{icon:svgIcon('fog',18),desc:'Freezing fog'},51:{icon:svgIcon('cloud-drizzle',18),desc:'Light drizzle'},53:{icon:svgIcon('cloud-drizzle',18),desc:'Moderate drizzle'},55:{icon:svgIcon('cloud-rain',18),desc:'Heavy drizzle'},61:{icon:svgIcon('cloud-rain',18),desc:'Light rain'},63:{icon:svgIcon('cloud-rain',18),desc:'Moderate rain'},65:{icon:svgIcon('cloud-rain',18),desc:'Heavy rain'},66:{icon:svgIcon('snowflake',18),desc:'Freezing rain'},67:{icon:svgIcon('snowflake',18),desc:'Heavy freezing rain'},71:{icon:svgIcon('cloud-snow',18),desc:'Light snow'},73:{icon:svgIcon('cloud-snow',18),desc:'Moderate snow'},75:{icon:svgIcon('cloud-snow',18),desc:'Heavy snow'},77:{icon:svgIcon('snowflake',18),desc:'Snow grains'},80:{icon:svgIcon('cloud-sun-rain',18),desc:'Light showers'},81:{icon:svgIcon('cloud-rain',18),desc:'Moderate showers'},82:{icon:svgIcon('violent-storm',18),desc:'Violent showers'},85:{icon:svgIcon('cloud-snow',18),desc:'Light snow showers'},86:{icon:svgIcon('cloud-snow',18),desc:'Heavy snow showers'},95:{icon:svgIcon('cloud-lightning',18),desc:'Thunderstorm'},96:{icon:svgIcon('cloud-lightning',18),desc:'Thunderstorm + hail'},99:{icon:svgIcon('cloud-lightning',18),desc:'Thunderstorm + heavy hail'} };
+    return m[code] || { icon: svgIcon('question-mark',18), desc: 'Unknown' };
 }
 
 function buildWeatherBar(weatherData) {
@@ -1075,7 +1128,7 @@ function buildWeatherBar(weatherData) {
     for (let i = 0; i < weatherData.length; i++) {
         const wp = weatherData[i];
         const cat = getWeatherCategory(wp.weatherCode);
-        const catInfo = cat === 'unknown' ? { color: '#e8eaed', icon: '❓' } : weatherCategories[cat];
+        const catInfo = cat === 'unknown' ? { color: '#e8eaed', icon: svgIcon('question-mark', 16, '#9aa0a6') } : weatherCategories[cat];
         const info = wp.noForecast ? { icon: '—' } : weatherCodeToInfo(wp.weatherCode, wp.arrivalTime ? wp.arrivalTime.getHours() : undefined);
         icons.push({ icon: info.icon, fraction: wp.fraction });
         if (i < weatherData.length - 1) segments.push({ width: (weatherData[i + 1].fraction - wp.fraction) * 100, color: catInfo.color });
@@ -1137,7 +1190,7 @@ function showWeatherCards(weatherData) {
             card.innerHTML = `<div class="card-top"><div class="weather-icon" style="opacity:0.4">—</div><div class="card-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div></div><div class="temp" style="color:#9aa0a6">N/A</div>`;
         } else {
             const precipText = wp.precipitationAmount > 0 ? `${wp.precipitationAmount.toFixed(2)}"` : `${wp.precipitationProb}%`;
-            card.innerHTML = `<div class="card-top"><div class="weather-icon">${info.icon}</div><div class="card-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div></div><div class="card-weather-row"><span class="temp">${Math.round(wp.temperature)}°F</span><span class="description">${info.desc}</span></div><div class="extra">💨 ${Math.round(wp.windSpeed)} mph · 💧 ${precipText}</div>`;
+            card.innerHTML = `<div class="card-top"><div class="weather-icon">${info.icon}</div><div class="card-info"><div class="location-name">${wp.locationName}</div><div class="arrival-time">${timeStr} · ${label}</div></div></div><div class="card-weather-row"><span class="temp">${Math.round(wp.temperature)}°F</span><span class="description">${info.desc}</span></div><div class="extra">${svgIcon('wind', 13, '#5f6368')} ${Math.round(wp.windSpeed)} mph · ${svgIcon('droplet', 13, '#4285f4')} ${precipText}</div>`;
         }
         card.addEventListener('click', () => { map.panTo({ lat: wp.lat, lng: wp.lon }); map.setZoom(10); });
         timelineCards.appendChild(card);
@@ -1148,11 +1201,11 @@ function shareTrip() {
     if (!currentWeatherData || !currentDirectionsResult) return;
     const route = currentDirectionsResult.routes[0];
     const leg = route.legs[0];
-    const text = `🚗 Trip: ${leg.start_address.split(',')[0]} → ${leg.end_address.split(',')[0]}\n⏱ ${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} miles\n\n🌤 Weather along the route:\n` +
+    const text = `Trip: ${leg.start_address.split(',')[0]} → ${leg.end_address.split(',')[0]}\n${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} miles\n\nWeather along the route:\n` +
         currentWeatherData.filter(w => !w.noForecast).map(w => {
             const info = weatherCodeToInfo(w.weatherCode, w.arrivalTime.getHours());
             const time = w.arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            return `${time} - ${w.locationName}: ${info.icon} ${Math.round(w.temperature)}°F ${info.desc}`;
+            return `${time} - ${w.locationName}: ${Math.round(w.temperature)}°F ${info.desc}`;
         }).join('\n');
 
     if (navigator.share) {
@@ -1160,7 +1213,7 @@ function shareTrip() {
     } else {
         navigator.clipboard.writeText(text).then(() => {
             const orig = shareTripBtn.innerHTML;
-            shareTripBtn.innerHTML = '✓ Copied!';
+            shareTripBtn.innerHTML = `${svgIcon('check', 14)} Copied!`;
             setTimeout(() => shareTripBtn.innerHTML = orig, 2000);
         });
     }
@@ -1173,7 +1226,7 @@ function printTrip() {
     const leg = route.legs[0];
     const w = window.open('', '_blank');
     w.document.write(`<html><head><title>Trip Summary</title><style>body{font-family:'Inter',Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px;color:#202124}h1{color:#4285f4;font-size:20px}h2{font-size:16px;margin-top:24px;border-bottom:2px solid #e8eaed;padding-bottom:6px;color:#202124}table{width:100%;border-collapse:collapse;margin:12px 0}td,th{padding:8px 12px;text-align:left;border-bottom:1px solid #e8eaed;font-size:13px}th{background:#f8f9fa;font-weight:600}.safety{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;margin:6px 0}@media print{body{margin:0}}</style></head><body>`);
-    w.document.write(`<h1>🚗 Trip: ${leg.start_address} → ${leg.end_address}</h1>`);
+    w.document.write(`<h1>Trip: ${leg.start_address} → ${leg.end_address}</h1>`);
     w.document.write(`<p>${formatDuration((leg.duration_in_traffic || leg.duration).value)} · ${Math.round(leg.distance.value / 1609.34)} miles via ${route.summary || 'route'}</p>`);
     if (rd) w.document.write(`<p class="safety" style="background:#e6f4ea;color:#137333">${rd.safetyLabel.icon} ${rd.safetyLabel.text}</p>`);
     w.document.write(`<h2>Weather Forecast</h2><table><tr><th>Time</th><th>Location</th><th>Weather</th><th>Temp</th><th>Wind</th><th>Precip</th></tr>`);
@@ -1214,7 +1267,7 @@ function loadRecentSearches() {
     recent.forEach(r => {
         const item = document.createElement('button');
         item.className = 'recent-item';
-        item.innerHTML = `<span class="recent-route">📍 ${r.origin.split(',')[0]} → ${r.destination.split(',')[0]}</span>`;
+        item.innerHTML = `<span class="recent-route">${svgIcon('map-pin', 14, '#5f6368')} ${r.origin.split(',')[0]} → ${r.destination.split(',')[0]}</span>`;
         item.addEventListener('click', () => {
             originInput.value = r.origin;
             destinationInput.value = r.destination;
@@ -1223,14 +1276,14 @@ function loadRecentSearches() {
     });
 }
 
-const defaultSavedIcons = { home: '🏠', work: '💼', school: '🎓', gym: '🏋️', airport: '✈️', hospital: '🏥', church: '⛪', store: '🛒' };
+const defaultSavedIconMap = { home: 'home', work: 'briefcase', school: 'school', gym: 'dumbbell', airport: 'plane', hospital: 'hospital', church: 'church', store: 'store' };
 
 function getSavedPlaceIcon(name) {
     const lower = name.toLowerCase();
-    for (const [key, icon] of Object.entries(defaultSavedIcons)) {
-        if (lower.includes(key)) return icon;
+    for (const [key, iconName] of Object.entries(defaultSavedIconMap)) {
+        if (lower.includes(key)) return svgIcon(iconName, 18, '#5f6368');
     }
-    return '📍';
+    return svgIcon('map-pin', 18, '#5f6368');
 }
 
 function getSavedPlaces() {
@@ -1249,8 +1302,8 @@ function renderSavedPlaces() {
 
     if (places.length === 0) {
         const defaults = [
-            { name: 'Home', address: '', icon: '🏠' },
-            { name: 'Work', address: '', icon: '💼' }
+            { name: 'Home', address: '', icon: svgIcon('home', 18, '#5f6368') },
+            { name: 'Work', address: '', icon: svgIcon('briefcase', 18, '#5f6368') }
         ];
         defaults.forEach(d => {
             const chip = document.createElement('button');
@@ -1657,17 +1710,17 @@ function updateNavDistanceToTurn(userLat, userLng) {
 function showTurnAlert(step) {
     const alertEl = document.getElementById('nav-alert');
     const text = (step.maneuver || '' + ' ' + step.instructions || '').toLowerCase();
-    let icon = '↗️';
-    if (text.includes('left')) icon = '⬅️';
-    else if (text.includes('right')) icon = '➡️';
-    else if (text.includes('uturn') || text.includes('u-turn')) icon = '↩️';
-    else if (text.includes('roundabout')) icon = '🔄';
+    let icon = svgIcon('arrow-up-right', 22, 'white');
+    if (text.includes('left')) icon = svgIcon('arrow-left', 22, 'white');
+    else if (text.includes('right')) icon = svgIcon('arrow-right', 22, 'white');
+    else if (text.includes('uturn') || text.includes('u-turn')) icon = svgIcon('u-turn', 22, 'white');
+    else if (text.includes('roundabout')) icon = svgIcon('rotate-cw', 22, 'white');
 
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = step.instructions;
     const cleanText = tempDiv.textContent;
 
-    document.getElementById('nav-alert-icon').textContent = icon;
+    document.getElementById('nav-alert-icon').innerHTML = icon;
     document.getElementById('nav-alert-text').textContent = cleanText.length > 40 ? cleanText.substring(0, 40) + '...' : cleanText;
     alertEl.classList.remove('hidden');
 
@@ -1729,8 +1782,8 @@ function showArrival() {
 
     document.getElementById('nav-arrived-address').textContent = lastLeg.end_address;
     document.getElementById('nav-arrived-stats').innerHTML = `
-        <span>⏱ ${formatDuration(Math.round(elapsed / 1000))}</span>
-        <span>📏 ${(navTotalDist / 1609.34).toFixed(1)} mi</span>
+        <span>${svgIcon('timer', 16)} ${formatDuration(Math.round(elapsed / 1000))}</span>
+        <span>${svgIcon('ruler', 16)} ${(navTotalDist / 1609.34).toFixed(1)} mi</span>
     `;
     arrivedEl.classList.remove('hidden');
 }
@@ -1752,7 +1805,7 @@ function checkOffRoute(userPos) {
     if (distToStart > stepLen + 200 && distToEnd > stepLen + 200 && stepLen > 0) {
         topBar.classList.add('nav-rerouting');
         document.getElementById('nav-instruction').textContent = 'Rerouting...';
-        document.getElementById('nav-distance-next').textContent = '📡';
+        document.getElementById('nav-distance-next').innerHTML = svgIcon('satellite', 20, 'white');
         reroute(userPos);
     } else {
         topBar.classList.remove('nav-rerouting');
@@ -1919,10 +1972,10 @@ async function fetchNavWeather() {
             const wind = data.hourly.windspeed_10m ? Math.round(data.hourly.windspeed_10m[h]) : null;
             const info = weatherCodeToInfo(code, hour);
             const strip = document.getElementById('nav-weather-strip');
-            document.getElementById('nav-weather-icon').textContent = info.icon;
+            document.getElementById('nav-weather-icon').innerHTML = info.icon;
             document.getElementById('nav-weather-temp').textContent = temp + '°F';
             document.getElementById('nav-weather-desc').textContent = info.desc;
-            document.getElementById('nav-weather-wind').textContent = wind ? `💨 ${wind} mph` : '';
+            document.getElementById('nav-weather-wind').innerHTML = wind ? `${svgIcon('wind', 14)} ${wind} mph` : '';
             strip.classList.remove('hidden');
 
             showWeatherPrediction(data.hourly, hour, code);
@@ -1957,12 +2010,12 @@ function showWeatherPrediction(hourly, currentHour, currentCode) {
 
         if (clearInHours) {
             const mins = clearInHours * 60;
-            iconEl.textContent = cat === 'storm' ? '⚡' : cat === 'snow' ? '🌨️' : '🌧️';
+            iconEl.innerHTML = cat === 'storm' ? svgIcon('cloud-lightning', 18, 'white') : cat === 'snow' ? svgIcon('cloud-snow', 18, 'white') : svgIcon('cloud-rain', 18, 'white');
             textEl.textContent = mins <= 60
                 ? `${cat === 'storm' ? 'Storm' : cat === 'snow' ? 'Snow' : 'Rain'} clearing in ~${mins} min`
                 : `${cat === 'storm' ? 'Storm' : cat === 'snow' ? 'Snow' : 'Rain'} clearing in ~${clearInHours} hr`;
         } else {
-            iconEl.textContent = cat === 'storm' ? '⚡' : cat === 'snow' ? '🌨️' : '🌧️';
+            iconEl.innerHTML = cat === 'storm' ? svgIcon('cloud-lightning', 18, 'white') : cat === 'snow' ? svgIcon('cloud-snow', 18, 'white') : svgIcon('cloud-rain', 18, 'white');
             textEl.textContent = `${cat === 'storm' ? 'Storm' : cat === 'snow' ? 'Snow' : 'Rain'} continuing`;
         }
         alertEl.classList.remove('hidden');
@@ -1982,7 +2035,7 @@ function showWeatherPrediction(hourly, currentHour, currentCode) {
             const minsUntil = (precipStartHour - currentHour) * 60;
             alertEl.className = 'alert-' + precipType;
 
-            iconEl.textContent = precipType === 'storm' ? '⚡' : precipType === 'snow' ? '🌨️' : '🌧️';
+            iconEl.innerHTML = precipType === 'storm' ? svgIcon('cloud-lightning', 18, 'white') : precipType === 'snow' ? svgIcon('cloud-snow', 18, 'white') : svgIcon('cloud-rain', 18, 'white');
             textEl.textContent = minsUntil <= 60
                 ? `${precipType === 'storm' ? 'Storm' : precipType === 'snow' ? 'Snow' : 'Rain'} starting in ~${minsUntil} min`
                 : `${precipType === 'storm' ? 'Storm' : precipType === 'snow' ? 'Snow' : 'Rain'} in ~${Math.round(minsUntil / 60)} hr`;
@@ -1997,14 +2050,14 @@ function showWeatherPrediction(hourly, currentHour, currentCode) {
                 if (highProbHour) {
                     const minsUntil = (highProbHour - currentHour) * 60;
                     alertEl.className = 'alert-rain';
-                    iconEl.textContent = '🌦️';
+                    iconEl.innerHTML = svgIcon('cloud-sun-rain', 18, 'white');
                     textEl.textContent = minsUntil <= 60
                         ? `${highPrecipProb[highProbHour]}% chance of rain in ~${minsUntil} min`
                         : `${highPrecipProb[highProbHour]}% chance of rain in ~${Math.round(minsUntil / 60)} hr`;
                     alertEl.classList.remove('hidden');
                 } else {
                     alertEl.className = 'alert-clear';
-                    iconEl.textContent = '☀️';
+                    iconEl.innerHTML = svgIcon('sun', 18, 'white');
                     textEl.textContent = 'Clear weather ahead';
                     alertEl.classList.remove('hidden');
                     if (navWeatherAlertTimeout) clearTimeout(navWeatherAlertTimeout);
